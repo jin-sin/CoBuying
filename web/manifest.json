@@ -1,11 +1,11 @@
 {
-    "name": "cobuying",
-    "short_name": "cobuying",
+    "name": "공동구매",
+    "short_name": "공동구매",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "App for co-buying",
+    "description": "기간 한정 공동구매 마켓",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
