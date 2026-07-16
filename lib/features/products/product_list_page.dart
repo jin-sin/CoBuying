@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
+import '../seller/seller_providers.dart';
 import 'product.dart';
 import 'products_providers.dart';
 import 'widgets/countdown_badge.dart';
@@ -17,30 +18,12 @@ class ProductListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final products = ref.watch(activeProductsProvider);
     final user = ref.watch(currentUserProvider);
-    final isAdmin = ref.watch(isAdminProvider);
     final cartCount = ref.watch(cartItemCountProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('공동구매'),
         actions: [
-          if (isAdmin)
-            IconButton(
-              tooltip: '관리자',
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              onPressed: () => context.push('/admin'),
-            ),
-          if (user != null)
-            IconButton(
-              tooltip: '셀러센터',
-              icon: const Icon(Icons.storefront_outlined),
-              onPressed: () => context.push('/seller'),
-            ),
-          IconButton(
-            tooltip: '주문내역',
-            icon: const Icon(Icons.receipt_long_outlined),
-            onPressed: () => context.push('/orders'),
-          ),
           Badge(
             isLabelVisible: cartCount > 0,
             label: Text('$cartCount'),
@@ -57,11 +40,7 @@ class ProductListPage extends ConsumerWidget {
               child: const Text('로그인'),
             )
           else
-            IconButton(
-              tooltip: '로그아웃',
-              icon: const Icon(Icons.logout),
-              onPressed: () => ref.read(authRepositoryProvider).signOut(),
-            ),
+            const _ProfileMenu(),
           const SizedBox(width: 4),
         ],
       ),
@@ -93,6 +72,68 @@ class ProductListPage extends ConsumerWidget {
                 ),
         ),
       ),
+    );
+  }
+}
+
+/// 로그인 사용자용 프로필 메뉴.
+/// 셀러센터는 입점 신청한 사용자에게만 그 이름으로 보이고,
+/// 일반 사용자에게는 "셀러 입점 신청"으로 노출된다. 관리자 메뉴는 admin만.
+class _ProfileMenu extends ConsumerWidget {
+  const _ProfileMenu();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAdmin = ref.watch(isAdminProvider);
+    final isSeller = ref.watch(mySellerProfileProvider).value != null;
+
+    return PopupMenuButton<String>(
+      tooltip: '내 메뉴',
+      icon: const Icon(Icons.person_outline),
+      onSelected: (value) {
+        switch (value) {
+          case 'orders':
+            context.push('/orders');
+          case 'seller':
+            context.push('/seller');
+          case 'admin':
+            context.push('/admin');
+          case 'logout':
+            ref.read(authRepositoryProvider).signOut();
+        }
+      },
+      itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: 'orders',
+          child: ListTile(
+            leading: Icon(Icons.receipt_long_outlined),
+            title: Text('주문 내역'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'seller',
+          child: ListTile(
+            leading: const Icon(Icons.storefront_outlined),
+            title: Text(isSeller ? '셀러센터' : '셀러 입점 신청'),
+          ),
+        ),
+        if (isAdmin)
+          const PopupMenuItem(
+            value: 'admin',
+            child: ListTile(
+              leading: Icon(Icons.admin_panel_settings_outlined),
+              title: Text('관리자'),
+            ),
+          ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'logout',
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('로그아웃'),
+          ),
+        ),
+      ],
     );
   }
 }
