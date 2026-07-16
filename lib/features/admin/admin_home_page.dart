@@ -14,20 +14,22 @@ class AdminHomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('관리자'),
-          bottom: const TabBar(tabs: [
+          bottom: const TabBar(isScrollable: true, tabs: [
             Tab(text: '셀러 관리'),
             Tab(text: '상품 관리'),
             Tab(text: '주문 관리'),
+            Tab(text: '정산'),
           ]),
         ),
         body: const TabBarView(children: [
           _AdminSellersTab(),
           _AdminProductsTab(),
           _AdminOrdersTab(),
+          _AdminSettlementTab(),
         ]),
       ),
     );
@@ -309,6 +311,130 @@ class _AdminOrdersTab extends ConsumerWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// 정산 탭: 셀러별 지급액과 정산 계좌를 한눈에.
+/// 결제 완료 이후 상태(paid~delivered) 주문 기준 누적 집계이며,
+/// 지급 이력 차감은 아직 없다 (v1: 지급 후 기간별로 수동 관리).
+class _AdminSettlementTab extends ConsumerWidget {
+  const _AdminSettlementTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sellers = ref.watch(allSellersProvider);
+    final settlements = ref.watch(allSettlementsProvider);
+
+    if (sellers.isLoading || settlements.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (sellers.hasError || settlements.hasError) {
+      return Center(
+          child: Text('불러오기 실패\n${sellers.error ?? settlements.error}'));
+    }
+
+    final sellerList = (sellers.value ?? [])
+        .where((s) => s.status == 'approved' || s.status == 'suspended')
+        .toList();
+    final byId = settlements.value ?? {};
+    final totalFees =
+        byId.values.fold(0, (sum, s) => sum + s.totalFees);
+    final totalPayout =
+        byId.values.fold(0, (sum, s) => sum + s.netPayout);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(allSellersProvider);
+        ref.invalidate(allSettlementsProvider);
+        await ref.read(allSettlementsProvider.future);
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      const Text('플랫폼 수수료 수익'),
+                      Text(formatWon(totalFees),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      const Text('셀러 지급 예정 합계'),
+                      Text(formatWon(totalPayout),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Text('결제 완료 이후 상태의 주문 기준 누적 금액입니다. '
+                '지급 후에는 기간을 정해 은행 이체 내역과 함께 관리하세요.',
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ),
+          if (sellerList.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 120),
+              child: Center(child: Text('승인된 셀러가 없습니다.')),
+            )
+          else
+            for (final s in sellerList)
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(s.shopName,
+                              style: Theme.of(context).textTheme.titleMedium),
+                          Text(
+                            '지급액 ${formatWon(byId[s.userId]?.netPayout ?? 0)}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '주문 ${byId[s.userId]?.orderCount ?? 0}건 · '
+                        '판매액 ${formatWon(byId[s.userId]?.grossSales ?? 0)} · '
+                        '수수료(${s.commissionRate.toStringAsFixed(1)}%) '
+                        '${formatWon(byId[s.userId]?.totalFees ?? 0)}',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      SelectableText(
+                        '입금 계좌: ${s.bankName} ${s.bankAccount} (${s.accountHolder})',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        ],
       ),
     );
   }

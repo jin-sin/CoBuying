@@ -31,3 +31,9 @@ final mySettlementProvider = FutureProvider.autoDispose<SellerSettlement>(
 final allSellersProvider = FutureProvider.autoDispose<List<SellerProfile>>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchAllSellers(),
 );
+
+/// 관리자용: 셀러별 정산 집계
+final allSettlementsProvider =
+    FutureProvider.autoDispose<Map<String, SellerSettlement>>(
+  (ref) => ref.watch(sellerRepositoryProvider).fetchAllSettlements(),
+);

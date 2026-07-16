@@ -109,4 +109,13 @@ class SellerRepository {
         .from('seller_profiles')
         .update({'commission_rate': rate}).eq('user_id', userId);
   }
+
+  /// 관리자용: 전체 셀러 정산 집계 (seller_id → 정산 요약)
+  Future<Map<String, SellerSettlement>> fetchAllSettlements() async {
+    final rows = await _client.from('seller_settlements').select();
+    return {
+      for (final row in rows)
+        row['seller_id'] as String: SellerSettlement.fromJson(row),
+    };
+  }
 }
