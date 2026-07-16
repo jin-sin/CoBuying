@@ -1,0 +1,152 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'seller_profile.dart';
+import 'seller_providers.dart';
+
+/// 셀러 입점 신청 / 정보 수정 폼.
+/// [existing]이 있으면 수정 모드.
+class SellerApplyPage extends ConsumerStatefulWidget {
+  const SellerApplyPage({super.key, this.existing});
+
+  final SellerProfile? existing;
+
+  @override
+  ConsumerState<SellerApplyPage> createState() => _SellerApplyPageState();
+}
+
+class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
+  final _formKey = GlobalKey<FormState>();
+  late final _shopName = TextEditingController(text: widget.existing?.shopName);
+  late final _bankName = TextEditingController(text: widget.existing?.bankName);
+  late final _bankAccount =
+      TextEditingController(text: widget.existing?.bankAccount);
+  late final _accountHolder =
+      TextEditingController(text: widget.existing?.accountHolder);
+  late final _contactPhone =
+      TextEditingController(text: widget.existing?.contactPhone);
+  bool _submitting = false;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void dispose() {
+    for (final c in [
+      _shopName, _bankName, _bankAccount, _accountHolder, _contactPhone,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    try {
+      final repo = ref.read(sellerRepositoryProvider);
+      if (_isEdit) {
+        await repo.updateInfo(
+          shopName: _shopName.text.trim(),
+          bankName: _bankName.text.trim(),
+          bankAccount: _bankAccount.text.trim(),
+          accountHolder: _accountHolder.text.trim(),
+          contactPhone: _contactPhone.text.trim(),
+        );
+      } else {
+        await repo.apply(
+          shopName: _shopName.text.trim(),
+          bankName: _bankName.text.trim(),
+          bankAccount: _bankAccount.text.trim(),
+          accountHolder: _accountHolder.text.trim(),
+          contactPhone: _contactPhone.text.trim(),
+        );
+      }
+      ref.invalidate(mySellerProfileProvider);
+      if (!mounted) return;
+      if (_isEdit) {
+        Navigator.of(context).pop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('입점 신청이 접수되었습니다. 관리자 승인을 기다려 주세요.')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('저장에 실패했습니다: $e')));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  String? _required(String? v) =>
+      (v == null || v.trim().isEmpty) ? '필수 입력입니다' : null;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(_isEdit ? '셀러 정보 수정' : '셀러 입점 신청')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (!_isEdit) ...[
+                  Text('상품을 판매하려면 입점 신청이 필요합니다.\n'
+                      '판매 대금은 등록한 계좌로 수수료를 제외하고 정산됩니다.',
+                      style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 20),
+                ],
+                TextFormField(
+                  controller: _shopName,
+                  decoration: const InputDecoration(labelText: '상호명 (판매자명) *'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _contactPhone,
+                  decoration: const InputDecoration(labelText: '연락처 *'),
+                  keyboardType: TextInputType.phone,
+                  validator: _required,
+                ),
+                const SizedBox(height: 24),
+                Text('정산 계좌', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _bankName,
+                  decoration: const InputDecoration(labelText: '은행명 *'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _bankAccount,
+                  decoration: const InputDecoration(labelText: '계좌번호 *'),
+                  keyboardType: TextInputType.number,
+                  validator: _required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _accountHolder,
+                  decoration: const InputDecoration(labelText: '예금주 *'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 32),
+                FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(_isEdit ? '수정 저장' : '입점 신청하기'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
