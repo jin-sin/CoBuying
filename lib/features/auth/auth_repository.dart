@@ -12,7 +12,10 @@ class AuthRepository {
 
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
 
-  String? get _redirectTo => kIsWeb ? null : Env.authCallbackScheme;
+  /// 웹: 현재 페이지로 복귀 (localhost 개발/실서비스 모두 대응)
+  /// 앱: 딥링크 스킴으로 복귀
+  String? get _redirectTo =>
+      kIsWeb ? '${Uri.base.origin}/' : Env.authCallbackScheme;
 
   Future<void> signInWithKakao() => _client.auth.signInWithOAuth(
         OAuthProvider.kakao,
