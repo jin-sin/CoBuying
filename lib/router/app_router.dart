@@ -67,9 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ProductEditPage(productId: state.pathParameters['id']),
       ),
       GoRoute(path: '/admin', builder: (_, _) => const AdminHomePage()),
-      GoRoute(
-          path: '/admin/product/new',
-          builder: (_, _) => const ProductEditPage()),
+      // 상품 등록은 셀러 전용. 관리자는 중재(수정/숨김)만 가능.
       GoRoute(
         path: '/admin/product/:id',
         builder: (_, state) =>

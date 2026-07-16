@@ -24,11 +24,6 @@ class AdminHomePage extends ConsumerWidget {
             Tab(text: '주문 관리'),
           ]),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => context.push('/admin/product/new'),
-          icon: const Icon(Icons.add),
-          label: const Text('상품 등록'),
-        ),
         body: const TabBarView(children: [
           _AdminSellersTab(),
           _AdminProductsTab(),
