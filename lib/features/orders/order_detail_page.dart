@@ -49,14 +49,47 @@ class OrderDetailPage extends ConsumerWidget {
   }
 }
 
-class _OrderDetail extends StatelessWidget {
+class _OrderDetail extends ConsumerWidget {
   const _OrderDetail({required this.order, required this.justPlaced});
 
   final Order order;
   final bool justPlaced;
 
+  Future<void> _cancelOrder(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('주문 취소'),
+        content: const Text('이 주문을 취소할까요?\n취소한 주문은 되돌릴 수 없습니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('아니요')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('주문 취소')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(ordersRepositoryProvider).cancelMyOrder(order.id);
+      ref.invalidate(orderProvider(order.id));
+      ref.invalidate(myOrdersProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('주문이 취소되었습니다.')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('취소에 실패했습니다: $e')));
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return Center(
@@ -77,7 +110,7 @@ class _OrderDetail extends StatelessWidget {
                       Expanded(
                         child: Text(
                           order.paymentMethod == 'bank_transfer'
-                              ? '주문이 접수되었습니다.\n아래 계좌로 입금해 주시면 확인 후 처리됩니다.\n${Env.bankAccountInfo}'
+                              ? '주문이 접수되었습니다.\n24시간 내에 아래 계좌로 입금해 주세요. 미입금 시 주문이 자동 취소됩니다.\n${Env.bankAccountInfo}'
                               : '주문이 접수되었습니다.',
                         ),
                       ),
@@ -132,6 +165,15 @@ class _OrderDetail extends StatelessWidget {
               OutlinedButton(
                 onPressed: () => context.go('/orders'),
                 child: const Text('주문 내역 보기'),
+              ),
+            ],
+            if (order.status == 'pending_payment') ...[
+              SizedBox(height: justPlaced ? 8 : 24),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error),
+                onPressed: () => _cancelOrder(context, ref),
+                child: const Text('주문 취소'),
               ),
             ],
           ],

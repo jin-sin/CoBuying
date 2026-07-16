@@ -482,3 +482,76 @@ with (security_invoker = true) as
     from public.seller_payouts
     group by seller_id
   ) p on p.seller_id = s.seller_id;
+
+-- ------------------------------------------------------------
+-- 13. 주문 취소 — 재고 복원 + 구매자 취소 RPC + 미입금 자동 만료
+-- ------------------------------------------------------------
+-- 취소로 전환될 때 재고 복원. 구매자 취소·관리자 취소·자동 만료가 모두
+-- 이 트리거 하나로 처리된다. 배송 시작 전 상태에서의 취소만 재고를 되돌린다.
+create or replace function public.restore_stock_on_cancel()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  update public.products p
+  set stock = p.stock + oi.qty, updated_at = now()
+  from (
+    select product_id, sum(quantity) as qty
+    from public.order_items
+    where order_id = new.id and product_id is not null
+    group by product_id
+  ) oi
+  where p.id = oi.product_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_restore_stock_on_cancel on public.orders;
+create trigger trg_restore_stock_on_cancel
+  after update of status on public.orders
+  for each row
+  when (old.status in ('pending_payment', 'paid', 'preparing')
+        and new.status = 'cancelled')
+  execute function public.restore_stock_on_cancel();
+
+-- 구매자 본인 주문 취소 (입금 대기 상태만 가능)
+create or replace function public.cancel_my_order(p_order_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_order public.orders%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+
+  select * into v_order
+  from public.orders
+  where id = p_order_id and user_id = auth.uid()
+  for update;
+
+  if not found then
+    raise exception '주문을 찾을 수 없습니다.';
+  end if;
+  if v_order.status <> 'pending_payment' then
+    raise exception '입금 대기 상태의 주문만 취소할 수 있습니다.';
+  end if;
+
+  update public.orders
+  set status = 'cancelled', updated_at = now()
+  where id = p_order_id;
+end;
+$$;
+
+-- 24시간 내 미입금 주문 자동 취소 (재고 복원은 위 트리거가 처리)
+select cron.schedule(
+  'expire-unpaid-orders',
+  '*/10 * * * *',
+  $$ update public.orders set status = 'cancelled', updated_at = now()
+     where status = 'pending_payment'
+       and payment_method = 'bank_transfer'
+       and created_at < now() - interval '24 hours' $$
+);

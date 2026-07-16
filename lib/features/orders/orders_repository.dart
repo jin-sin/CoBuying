@@ -57,6 +57,12 @@ class OrdersRepository {
     return row == null ? null : Order.fromJson(row);
   }
 
+  /// 구매자 본인 주문 취소. 서버 RPC가 상태 검증(입금 대기만 가능)과
+  /// 재고 복원(트리거)을 처리한다.
+  Future<void> cancelMyOrder(String orderId) async {
+    await _client.rpc('cancel_my_order', params: {'p_order_id': orderId});
+  }
+
   /// 관리자용: 전체 주문
   Future<List<Order>> fetchAllOrders() async {
     final rows = await _client
