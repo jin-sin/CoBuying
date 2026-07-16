@@ -13,7 +13,17 @@ class OrderListPage extends ConsumerWidget {
     final orders = ref.watch(myOrdersProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('주문 내역')),
+      appBar: AppBar(
+        title: const Text('주문 내역'),
+        // 주문 완료 화면에서 넘어오는 등 스택이 비어 있으면 홈으로 나갈 수단을 준다.
+        leading: context.canPop()
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.home_outlined),
+                tooltip: '홈으로',
+                onPressed: () => context.go('/'),
+              ),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(myOrdersProvider.future),
         child: orders.when(

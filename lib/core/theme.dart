@@ -12,7 +12,9 @@ ThemeData buildAppTheme() {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
+        // 최소 너비를 무한대(Size.fromHeight)로 두면 Row 등 가로 무제한
+        // 레이아웃에서 버튼이 그려지지 않는다. 높이만 키우고 너비는 내용에 맡긴다.
+        minimumSize: const Size(64, 52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),

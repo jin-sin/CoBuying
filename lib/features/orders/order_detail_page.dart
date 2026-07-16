@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/env.dart';
 import '../../core/formatters.dart';
@@ -23,7 +24,17 @@ class OrderDetailPage extends ConsumerWidget {
     final orderAsync = ref.watch(orderProvider(orderId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('주문 상세')),
+      appBar: AppBar(
+        title: const Text('주문 상세'),
+        // 주문 완료 직후처럼 스택이 비어 있으면 홈으로 나갈 수단을 준다.
+        leading: context.canPop()
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.home_outlined),
+                tooltip: '홈으로',
+                onPressed: () => context.go('/'),
+              ),
+      ),
       body: orderAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('주문을 불러오지 못했습니다.\n$e')),
@@ -111,6 +122,18 @@ class _OrderDetail extends StatelessWidget {
                 if (order.memo.isNotEmpty) _row('배송 메모', order.memo),
               ],
             ),
+            if (justPlaced) ...[
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => context.go('/'),
+                child: const Text('쇼핑 계속하기'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => context.go('/orders'),
+                child: const Text('주문 내역 보기'),
+              ),
+            ],
           ],
         ),
       ),
