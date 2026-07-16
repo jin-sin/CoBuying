@@ -65,6 +65,7 @@ class _AdminSellersTab extends ConsumerWidget {
     if (rate == null || rate < 0 || rate > 100) return;
     await ref.read(sellerRepositoryProvider).updateCommissionRate(userId, rate);
     ref.invalidate(allSellersProvider);
+    ref.invalidate(mySellerProfileProvider); // 본인이 셀러 겸직 시 즉시 반영
   }
 
   @override
@@ -112,6 +113,8 @@ class _AdminSellersTab extends ConsumerWidget {
                                         .updateSellerStatus(
                                             s.userId, 'approved');
                                     ref.invalidate(allSellersProvider);
+                                    ref.invalidate(
+                                        mySellerProfileProvider);
                                   },
                                   child: const Text('승인'),
                                 ),
@@ -123,6 +126,8 @@ class _AdminSellersTab extends ConsumerWidget {
                                         .updateSellerStatus(
                                             s.userId, 'rejected');
                                     ref.invalidate(allSellersProvider);
+                                    ref.invalidate(
+                                        mySellerProfileProvider);
                                   },
                                   child: const Text('반려'),
                                 ),
@@ -134,6 +139,8 @@ class _AdminSellersTab extends ConsumerWidget {
                                         .updateSellerStatus(
                                             s.userId, 'suspended');
                                     ref.invalidate(allSellersProvider);
+                                    ref.invalidate(
+                                        mySellerProfileProvider);
                                   },
                                   child: const Text('이용 정지'),
                                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -132,8 +133,12 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _receiverPhone,
-                        decoration: const InputDecoration(labelText: '연락처 *'),
+                        decoration: const InputDecoration(
+                            labelText: '연락처 *', hintText: '숫자만 입력'),
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
                         validator: (v) =>
                             (v == null || v.trim().isEmpty) ? '연락처를 입력하세요' : null,
                       ),
@@ -144,6 +149,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                             child: TextFormField(
                               controller: _postcode,
                               decoration: const InputDecoration(labelText: '우편번호'),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                             ),
                           ),
                         ],

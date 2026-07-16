@@ -19,15 +19,15 @@ final isApprovedSellerProvider = Provider<bool>(
   (ref) => ref.watch(mySellerProfileProvider).value?.isApproved ?? false,
 );
 
-final mySalesProvider = FutureProvider<List<(OrderItem, Order)>>(
+final mySalesProvider = FutureProvider.autoDispose<List<(OrderItem, Order)>>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchMySales(),
 );
 
-final mySettlementProvider = FutureProvider<SellerSettlement>(
+final mySettlementProvider = FutureProvider.autoDispose<SellerSettlement>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchMySettlement(),
 );
 
-/// 관리자용: 전체 셀러 목록
-final allSellersProvider = FutureProvider<List<SellerProfile>>(
+/// 관리자용: 전체 셀러 목록 (페이지 재진입 시 다시 조회)
+final allSellersProvider = FutureProvider.autoDispose<List<SellerProfile>>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchAllSellers(),
 );

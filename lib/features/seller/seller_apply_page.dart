@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'seller_profile.dart';
@@ -107,8 +108,10 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _contactPhone,
-                  decoration: const InputDecoration(labelText: '연락처 *'),
+                  decoration: const InputDecoration(
+                      labelText: '연락처 *', hintText: '숫자만 입력'),
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: _required,
                 ),
                 const SizedBox(height: 24),
@@ -122,8 +125,10 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _bankAccount,
-                  decoration: const InputDecoration(labelText: '계좌번호 *'),
+                  decoration: const InputDecoration(
+                      labelText: '계좌번호 *', hintText: '숫자만 입력 (- 제외)'),
                   keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: _required,
                 ),
                 const SizedBox(height: 12),

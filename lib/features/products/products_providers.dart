@@ -13,17 +13,17 @@ final activeProductsProvider = FutureProvider<List<Product>>(
   (ref) => ref.watch(productsRepositoryProvider).fetchActiveProducts(),
 );
 
-/// 관리자용: 전체 상품 목록
-final allProductsProvider = FutureProvider<List<Product>>(
+/// 관리자용: 전체 상품 목록 (페이지 재진입 시 다시 조회)
+final allProductsProvider = FutureProvider.autoDispose<List<Product>>(
   (ref) => ref.watch(productsRepositoryProvider).fetchAllProducts(),
 );
 
-/// 셀러용: 내가 등록한 상품 목록
-final myProductsProvider = FutureProvider<List<Product>>((ref) {
+/// 셀러용: 내가 등록한 상품 목록 (페이지 재진입 시 다시 조회)
+final myProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) {
   ref.watch(authStateProvider);
   return ref.watch(productsRepositoryProvider).fetchMyProducts();
 });
 
-final productProvider = FutureProvider.family<Product?, String>(
+final productProvider = FutureProvider.autoDispose.family<Product?, String>(
   (ref, id) => ref.watch(productsRepositoryProvider).fetchProduct(id),
 );

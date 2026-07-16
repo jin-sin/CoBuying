@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -205,6 +206,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                               decoration: const InputDecoration(
                                   labelText: '공동구매가 (원) *'),
                               keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                               validator: _requiredNumber,
                             ),
                           ),
@@ -215,6 +219,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                               decoration: const InputDecoration(
                                   labelText: '정가 (선택)'),
                               keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                             ),
                           ),
                         ],
@@ -224,6 +231,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         controller: _stock,
                         decoration: const InputDecoration(labelText: '재고 수량 *'),
                         keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                         validator: _requiredNumber,
                       ),
                       const SizedBox(height: 24),
