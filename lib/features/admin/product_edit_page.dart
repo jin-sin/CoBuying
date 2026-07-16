@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/formatters.dart';
 import '../products/product.dart';
 import '../products/products_providers.dart';
 
@@ -169,8 +170,15 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 자주 쓰는 기한 프리셋: 하루, 이틀, 사흘, 일주일
-    const presets = {'1일': 1, '2일': 2, '3일': 3, '7일': 7};
+    // 자주 쓰는 기한 프리셋 (시간 단위 포함)
+    const presets = {
+      '6시간': Duration(hours: 6),
+      '12시간': Duration(hours: 12),
+      '1일': Duration(days: 1),
+      '2일': Duration(days: 2),
+      '3일': Duration(days: 3),
+      '7일': Duration(days: 7),
+    };
 
     return Scaffold(
       appBar: AppBar(title: Text(_isEdit ? '상품 수정' : '상품 등록')),
@@ -243,29 +251,32 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: const Text('판매 시작'),
-                        trailing: TextButton(
+                        subtitle: const Text('날짜와 시간(분 단위)까지 선택됩니다'),
+                        trailing: TextButton.icon(
+                          icon: const Icon(Icons.edit_calendar_outlined),
                           onPressed: () => _pickDateTime(isEnd: false),
-                          child: Text(
-                              '${_startsAt.year}.${_startsAt.month}.${_startsAt.day} ${_startsAt.hour.toString().padLeft(2, '0')}:${_startsAt.minute.toString().padLeft(2, '0')}'),
+                          label: Text(formatDateTime(_startsAt)),
                         ),
                       ),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: const Text('판매 마감'),
-                        trailing: TextButton(
+                        subtitle: const Text('날짜 선택 후 시간 선택 창이 이어서 뜹니다'),
+                        trailing: TextButton.icon(
+                          icon: const Icon(Icons.edit_calendar_outlined),
                           onPressed: () => _pickDateTime(isEnd: true),
-                          child: Text(
-                              '${_endsAt.year}.${_endsAt.month}.${_endsAt.day} ${_endsAt.hour.toString().padLeft(2, '0')}:${_endsAt.minute.toString().padLeft(2, '0')}'),
+                          label: Text(formatDateTime(_endsAt)),
                         ),
                       ),
                       Wrap(
                         spacing: 8,
+                        runSpacing: 4,
                         children: [
                           for (final entry in presets.entries)
                             ActionChip(
                               label: Text('시작 후 ${entry.key}'),
-                              onPressed: () => setState(() => _endsAt =
-                                  _startsAt.add(Duration(days: entry.value))),
+                              onPressed: () => setState(
+                                  () => _endsAt = _startsAt.add(entry.value)),
                             ),
                         ],
                       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:postal_ko/postal_ko.dart';
 
 import '../../core/env.dart';
 import '../../core/formatters.dart';
@@ -37,6 +38,19 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// 카카오 우편번호 서비스로 주소 검색 (postal_ko)
+  Future<void> _searchAddress() async {
+    final result = await Navigator.of(context).push<Kpostal>(
+      MaterialPageRoute(builder: (_) => KpostalView()),
+    );
+    if (result == null) return;
+    setState(() {
+      _postcode.text = result.postCode;
+      _address1.text =
+          result.roadAddress.isNotEmpty ? result.roadAddress : result.address;
+    });
   }
 
   Future<void> _submit() async {
@@ -144,15 +158,24 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                       ),
                       const SizedBox(height: 12),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: TextFormField(
                               controller: _postcode,
-                              decoration: const InputDecoration(labelText: '우편번호'),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly
-                              ],
+                              readOnly: true,
+                              decoration: const InputDecoration(
+                                  labelText: '우편번호', hintText: '주소 검색을 눌러주세요'),
+                              onTap: _searchAddress,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            height: 52,
+                            child: OutlinedButton.icon(
+                              onPressed: _searchAddress,
+                              icon: const Icon(Icons.search),
+                              label: const Text('주소 검색'),
                             ),
                           ),
                         ],
@@ -160,9 +183,11 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _address1,
+                        readOnly: true,
                         decoration: const InputDecoration(labelText: '주소 *'),
+                        onTap: _searchAddress,
                         validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? '주소를 입력하세요' : null,
+                            (v == null || v.trim().isEmpty) ? '주소를 검색해 주세요' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
