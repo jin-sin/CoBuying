@@ -441,3 +441,44 @@ select cron.schedule(
 -- ------------------------------------------------------------
 -- update public.profiles set role = 'admin'
 -- where id = (select id from auth.users where email = 's.conast@gmail.com');
+
+-- ------------------------------------------------------------
+-- 12. 셀러 지급(정산 이체) 기록 — 잔액 차감용
+-- ------------------------------------------------------------
+create table if not exists public.seller_payouts (
+  id         uuid primary key default gen_random_uuid(),
+  seller_id  uuid not null references auth.users (id) on delete restrict,
+  amount     integer not null check (amount > 0),
+  memo       text not null default '',
+  paid_at    timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_seller_payouts_seller
+  on public.seller_payouts (seller_id, paid_at desc);
+
+alter table public.seller_payouts enable row level security;
+
+drop policy if exists "payouts_select" on public.seller_payouts;
+create policy "payouts_select" on public.seller_payouts
+  for select using (seller_id = auth.uid() or public.is_admin());
+drop policy if exists "payouts_admin_write" on public.seller_payouts;
+create policy "payouts_admin_write" on public.seller_payouts
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- 정산 잔액 뷰: 누적 정산액(seller_settlements) - 지급 합계 = 미지급 잔액
+create or replace view public.seller_balances
+with (security_invoker = true) as
+  select s.seller_id,
+         s.order_count,
+         s.gross_sales,
+         s.total_fees,
+         s.net_payout,
+         coalesce(p.total_paid, 0)::bigint          as total_paid,
+         (s.net_payout - coalesce(p.total_paid, 0))::bigint as balance
+  from public.seller_settlements s
+  left join (
+    select seller_id, sum(amount) as total_paid
+    from public.seller_payouts
+    group by seller_id
+  ) p on p.seller_id = s.seller_id;

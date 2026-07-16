@@ -37,3 +37,8 @@ final allSettlementsProvider =
     FutureProvider.autoDispose<Map<String, SellerSettlement>>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchAllSettlements(),
 );
+
+/// 내 지급 내역 (셀러센터용)
+final myPayoutsProvider = FutureProvider.autoDispose<List<SellerPayout>>(
+  (ref) => ref.watch(sellerRepositoryProvider).fetchPayouts(),
+);

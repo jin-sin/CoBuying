@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
 import '../orders/orders_providers.dart';
 import '../products/products_providers.dart';
+import '../seller/seller_profile.dart';
 import '../seller/seller_providers.dart';
 
 /// 관리자 홈: 셀러 관리 / 상품 관리 / 주문 관리 탭
@@ -322,6 +324,94 @@ class _AdminOrdersTab extends ConsumerWidget {
 class _AdminSettlementTab extends ConsumerWidget {
   const _AdminSettlementTab();
 
+  /// 이체 완료 후 지급 기록 등록 (금액 기본값은 미지급 잔액 전액)
+  Future<void> _recordPayout(BuildContext context, WidgetRef ref,
+      SellerProfile seller, int balance) async {
+    final amountCtrl = TextEditingController(text: '$balance');
+    final memoCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${seller.shopName} 지급 기록'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${seller.bankName} ${seller.bankAccount} (${seller.accountHolder})'
+                '\n계좌로 이체를 마친 뒤 기록하세요.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                  labelText: '지급 금액 (원)', helperText: '기본값: 미지급 잔액 전액'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: memoCtrl,
+              decoration: const InputDecoration(labelText: '메모 (선택)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('지급 기록 저장')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
+    if (amount <= 0 || amount > balance) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('금액은 1원 이상, 미지급 잔액 이하여야 합니다.')));
+      }
+      return;
+    }
+    await ref.read(sellerRepositoryProvider).recordPayout(
+        sellerId: seller.userId, amount: amount, memo: memoCtrl.text.trim());
+    ref.invalidate(allSettlementsProvider);
+  }
+
+  Future<void> _showPayoutHistory(
+      BuildContext context, WidgetRef ref, SellerProfile seller) async {
+    final payouts =
+        await ref.read(sellerRepositoryProvider).fetchPayouts(seller.userId);
+    if (!context.mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${seller.shopName} 지급 내역'),
+        content: SizedBox(
+          width: 400,
+          child: payouts.isEmpty
+              ? const Text('지급 내역이 없습니다.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final p in payouts)
+                      ListTile(
+                        dense: true,
+                        title: Text(formatWon(p.amount)),
+                        subtitle: Text(formatDateTime(p.paidAt) +
+                            (p.memo.isEmpty ? '' : ' · ${p.memo}')),
+                      ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기')),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sellers = ref.watch(allSellersProvider);
@@ -341,8 +431,8 @@ class _AdminSettlementTab extends ConsumerWidget {
     final byId = settlements.value ?? {};
     final totalFees =
         byId.values.fold(0, (sum, s) => sum + s.totalFees);
-    final totalPayout =
-        byId.values.fold(0, (sum, s) => sum + s.netPayout);
+    final totalBalance =
+        byId.values.fold(0, (sum, s) => sum + s.balance);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -372,8 +462,8 @@ class _AdminSettlementTab extends ConsumerWidget {
                   ),
                   Column(
                     children: [
-                      const Text('셀러 지급 예정 합계'),
-                      Text(formatWon(totalPayout),
+                      const Text('미지급 잔액 합계'),
+                      Text(formatWon(totalBalance),
                           style: Theme.of(context)
                               .textTheme
                               .titleLarge
@@ -387,8 +477,8 @@ class _AdminSettlementTab extends ConsumerWidget {
           const SizedBox(height: 8),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 4),
-            child: Text('결제 완료 이후 상태의 주문 기준 누적 금액입니다. '
-                '지급 후에는 기간을 정해 은행 이체 내역과 함께 관리하세요.',
+            child: Text('결제 완료 이후 상태의 주문 기준입니다. '
+                '셀러 계좌로 이체한 뒤 [지급 기록]을 남기면 잔액에서 차감됩니다.',
                 style: TextStyle(color: Colors.grey, fontSize: 12)),
           ),
           if (sellerList.isEmpty)
@@ -411,9 +501,13 @@ class _AdminSettlementTab extends ConsumerWidget {
                           Text(s.shopName,
                               style: Theme.of(context).textTheme.titleMedium),
                           Text(
-                            '지급액 ${formatWon(byId[s.userId]?.netPayout ?? 0)}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
+                            '미지급 ${formatWon(byId[s.userId]?.balance ?? 0)}',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: (byId[s.userId]?.balance ?? 0) > 0
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.grey),
                           ),
                         ],
                       ),
@@ -422,13 +516,33 @@ class _AdminSettlementTab extends ConsumerWidget {
                         '주문 ${byId[s.userId]?.orderCount ?? 0}건 · '
                         '판매액 ${formatWon(byId[s.userId]?.grossSales ?? 0)} · '
                         '수수료(${s.commissionRate.toStringAsFixed(1)}%) '
-                        '${formatWon(byId[s.userId]?.totalFees ?? 0)}',
+                        '${formatWon(byId[s.userId]?.totalFees ?? 0)} · '
+                        '지급 완료 ${formatWon(byId[s.userId]?.totalPaid ?? 0)}',
                         style: TextStyle(color: Colors.grey[700], fontSize: 13),
                       ),
                       const SizedBox(height: 6),
                       SelectableText(
                         '입금 계좌: ${s.bankName} ${s.bankAccount} (${s.accountHolder})',
                         style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          FilledButton.tonalIcon(
+                            icon: const Icon(Icons.payments_outlined, size: 18),
+                            label: const Text('지급 기록'),
+                            onPressed: (byId[s.userId]?.balance ?? 0) <= 0
+                                ? null
+                                : () => _recordPayout(
+                                    context, ref, s, byId[s.userId]!.balance),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () =>
+                                _showPayoutHistory(context, ref, s),
+                            child: const Text('지급 내역'),
+                          ),
+                        ],
                       ),
                     ],
                   ),

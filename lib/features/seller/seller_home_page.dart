@@ -252,10 +252,41 @@ class _SettlementTab extends ConsumerWidget {
                   _row(context,
                       '플랫폼 수수료 (${profile.commissionRate.toStringAsFixed(1)}%)',
                       '-${formatWon(s.totalFees)}'),
+                  _row(context, '지급 완료', '-${formatWon(s.totalPaid)}'),
                   const Divider(),
-                  _row(context, '지급 예정액', formatWon(s.netPayout), bold: true),
+                  _row(context, '미지급 잔액', formatWon(s.balance), bold: true),
                 ],
               ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('지급 받은 내역', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Consumer(builder: (context, ref, _) {
+                  final payouts = ref.watch(myPayoutsProvider).value ?? [];
+                  if (payouts.isEmpty) {
+                    return const Text('아직 지급 받은 내역이 없습니다.',
+                        style: TextStyle(color: Colors.grey));
+                  }
+                  return Column(
+                    children: [
+                      for (final p in payouts)
+                        _row(
+                            context,
+                            formatDateTime(p.paidAt) +
+                                (p.memo.isEmpty ? '' : ' · ${p.memo}'),
+                            formatWon(p.amount)),
+                    ],
+                  );
+                }),
+              ],
             ),
           ),
         ),

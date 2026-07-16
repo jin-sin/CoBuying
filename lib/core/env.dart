@@ -13,6 +13,6 @@ class Env {
   /// OAuth 콜백용 앱 딥링크 스킴 (웹에서는 사용하지 않음)
   static const authCallbackScheme = 'io.cobuying://login-callback';
 
-  /// 무통장입금 안내 계좌
-  static const bankAccountInfo = '국민은행 000000-00-000000 (예금주: 홍길동)';
+  /// 무통장입금 안내 계좌 (플랫폼 수취 계좌)
+  static const bankAccountInfo = '국민은행 91102204374 (예금주: 신규리)';
 }

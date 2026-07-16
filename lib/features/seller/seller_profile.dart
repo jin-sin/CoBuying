@@ -41,19 +41,23 @@ class SellerProfile {
       );
 }
 
-/// seller_settlements 뷰의 한 행
+/// seller_balances 뷰의 한 행 (누적 정산액과 지급 차감 잔액)
 class SellerSettlement {
   const SellerSettlement({
     required this.orderCount,
     required this.grossSales,
     required this.totalFees,
     required this.netPayout,
+    this.totalPaid = 0,
+    this.balance = 0,
   });
 
   final int orderCount;
   final int grossSales; // 총 판매액
   final int totalFees; // 플랫폼 수수료
-  final int netPayout; // 셀러 지급액
+  final int netPayout; // 누적 정산액 (판매액 - 수수료)
+  final int totalPaid; // 지급 완료 합계
+  final int balance; // 미지급 잔액
 
   static const empty = SellerSettlement(
       orderCount: 0, grossSales: 0, totalFees: 0, netPayout: 0);
@@ -64,5 +68,26 @@ class SellerSettlement {
         grossSales: (json['gross_sales'] as num).toInt(),
         totalFees: (json['total_fees'] as num).toInt(),
         netPayout: (json['net_payout'] as num).toInt(),
+        totalPaid: (json['total_paid'] as num? ?? 0).toInt(),
+        balance: (json['balance'] as num? ?? json['net_payout'] as num).toInt(),
+      );
+}
+
+/// 지급(정산 이체) 기록 한 건
+class SellerPayout {
+  const SellerPayout({
+    required this.amount,
+    required this.memo,
+    required this.paidAt,
+  });
+
+  final int amount;
+  final String memo;
+  final DateTime paidAt;
+
+  factory SellerPayout.fromJson(Map<String, dynamic> json) => SellerPayout(
+        amount: (json['amount'] as num).toInt(),
+        memo: json['memo'] as String? ?? '',
+        paidAt: DateTime.parse(json['paid_at'] as String),
       );
 }
