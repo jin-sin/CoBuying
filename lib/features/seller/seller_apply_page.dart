@@ -26,6 +26,10 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
       TextEditingController(text: widget.existing?.accountHolder);
   late final _contactPhone =
       TextEditingController(text: widget.existing?.contactPhone);
+  late final _businessNumber =
+      TextEditingController(text: widget.existing?.businessNumber);
+  late final _onlineSalesNumber =
+      TextEditingController(text: widget.existing?.onlineSalesNumber);
   bool _submitting = false;
 
   bool get _isEdit => widget.existing != null;
@@ -34,6 +38,7 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
   void dispose() {
     for (final c in [
       _shopName, _bankName, _bankAccount, _accountHolder, _contactPhone,
+      _businessNumber, _onlineSalesNumber,
     ]) {
       c.dispose();
     }
@@ -52,6 +57,8 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
           bankAccount: _bankAccount.text.trim(),
           accountHolder: _accountHolder.text.trim(),
           contactPhone: _contactPhone.text.trim(),
+          businessNumber: _businessNumber.text.trim(),
+          onlineSalesNumber: _onlineSalesNumber.text.trim(),
         );
       } else {
         await repo.apply(
@@ -60,6 +67,8 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
           bankAccount: _bankAccount.text.trim(),
           accountHolder: _accountHolder.text.trim(),
           contactPhone: _contactPhone.text.trim(),
+          businessNumber: _businessNumber.text.trim(),
+          onlineSalesNumber: _onlineSalesNumber.text.trim(),
         );
       }
       ref.invalidate(mySellerProfileProvider);
@@ -81,6 +90,23 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
 
   String? _required(String? v) =>
       (v == null || v.trim().isEmpty) ? '필수 입력입니다' : null;
+
+  /// 사업자등록번호 10자리 체크섬 검증 (국세청 검증 로직)
+  String? _validateBusinessNumber(String? v) {
+    final digits = v?.trim() ?? '';
+    if (digits.isEmpty) return '필수 입력입니다';
+    if (digits.length != 10) return '숫자 10자리를 입력하세요';
+    const weights = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+    var sum = 0;
+    for (var i = 0; i < 9; i++) {
+      sum += int.parse(digits[i]) * weights[i];
+    }
+    sum += (int.parse(digits[8]) * 5) ~/ 10;
+    if ((10 - sum % 10) % 10 != int.parse(digits[9])) {
+      return '올바르지 않은 사업자등록번호입니다';
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +139,28 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
                   keyboardType: TextInputType.phone,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: _required,
+                ),
+                const SizedBox(height: 24),
+                Text('사업자 정보', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _businessNumber,
+                  decoration: const InputDecoration(
+                      labelText: '사업자등록번호 *',
+                      hintText: '숫자 10자리 (- 제외)'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: _validateBusinessNumber,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _onlineSalesNumber,
+                  decoration: const InputDecoration(
+                      labelText: '통신판매업 신고번호 (선택)',
+                      hintText: '예: 2026-서울강남-01234'),
                 ),
                 const SizedBox(height: 24),
                 Text('정산 계좌', style: Theme.of(context).textTheme.titleMedium),

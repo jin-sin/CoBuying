@@ -919,3 +919,12 @@ begin
   return v_order_id;
 end;
 $$;
+
+-- ------------------------------------------------------------
+-- 17. 셀러 사업자 정보
+--     입점 신청 시 사업자등록번호(필수)와 통신판매업 신고번호(선택)를 받는다.
+--     형식 검증(10자리 체크섬)은 클라이언트에서 수행.
+-- ------------------------------------------------------------
+alter table public.seller_profiles
+  add column if not exists business_number text not null default '',       -- 사업자등록번호 (숫자 10자리)
+  add column if not exists online_sales_number text not null default '';   -- 통신판매업 신고번호 (선택)

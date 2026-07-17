@@ -8,6 +8,8 @@ class SellerProfile {
     required this.contactPhone,
     required this.commissionRate,
     required this.status,
+    this.businessNumber = '',
+    this.onlineSalesNumber = '',
   });
 
   final String userId;
@@ -18,6 +20,13 @@ class SellerProfile {
   final String contactPhone;
   final double commissionRate;
   final String status; // pending | approved | rejected | suspended
+  final String businessNumber; // 사업자등록번호 (숫자 10자리)
+  final String onlineSalesNumber; // 통신판매업 신고번호 (선택)
+
+  /// 000-00-00000 표시용
+  String get businessNumberFormatted => businessNumber.length == 10
+      ? '${businessNumber.substring(0, 3)}-${businessNumber.substring(3, 5)}-${businessNumber.substring(5)}'
+      : businessNumber;
 
   bool get isApproved => status == 'approved';
 
@@ -38,6 +47,8 @@ class SellerProfile {
         contactPhone: json['contact_phone'] as String? ?? '',
         commissionRate: (json['commission_rate'] as num).toDouble(),
         status: json['status'] as String,
+        businessNumber: json['business_number'] as String? ?? '',
+        onlineSalesNumber: json['online_sales_number'] as String? ?? '',
       );
 }
 

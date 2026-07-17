@@ -26,6 +26,8 @@ class SellerRepository {
     required String bankAccount,
     required String accountHolder,
     required String contactPhone,
+    required String businessNumber,
+    String onlineSalesNumber = '',
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('로그인이 필요합니다.');
@@ -36,6 +38,8 @@ class SellerRepository {
       'bank_account': bankAccount,
       'account_holder': accountHolder,
       'contact_phone': contactPhone,
+      'business_number': businessNumber,
+      'online_sales_number': onlineSalesNumber,
     });
   }
 
@@ -46,6 +50,8 @@ class SellerRepository {
     required String bankAccount,
     required String accountHolder,
     required String contactPhone,
+    required String businessNumber,
+    String onlineSalesNumber = '',
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('로그인이 필요합니다.');
@@ -55,6 +61,8 @@ class SellerRepository {
       'bank_account': bankAccount,
       'account_holder': accountHolder,
       'contact_phone': contactPhone,
+      'business_number': businessNumber,
+      'online_sales_number': onlineSalesNumber,
     }).eq('user_id', user.id);
   }
 

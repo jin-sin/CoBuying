@@ -102,7 +102,11 @@ class _AdminSellersTab extends ConsumerWidget {
                           dense: true,
                           title: Text(
                               '정산: ${s.bankName} ${s.bankAccount} (${s.accountHolder})'),
-                          subtitle: Text('연락처: ${s.contactPhone}'),
+                          subtitle: Text(
+                              '연락처: ${s.contactPhone}\n'
+                              '사업자등록번호: ${s.businessNumber.isEmpty ? '(미입력)' : s.businessNumberFormatted}'
+                              '${s.onlineSalesNumber.isEmpty ? '' : '\n통신판매업: ${s.onlineSalesNumber}'}'),
+                          isThreeLine: true,
                         ),
                         Padding(
                           padding: const EdgeInsets.all(12),
