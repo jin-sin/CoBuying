@@ -13,8 +13,21 @@ class Env {
   /// OAuth 콜백용 앱 딥링크 스킴 (웹에서는 사용하지 않음)
   static const authCallbackScheme = 'io.cobuying://login-callback';
 
+  /// 카카오 네이티브 앱 키 (앱 전용 — 톡 앱 전환 로그인).
+  /// 변경 시 Info.plist·AndroidManifest의 kakao{키} 스킴도 함께 바꿔야 한다.
+  static const kakaoNativeAppKey = String.fromEnvironment(
+    'KAKAO_NATIVE_APP_KEY',
+    defaultValue: '787ca823fe97b63bea5d8163315c14c0',
+  );
+
   /// 무통장입금 안내 계좌 (플랫폼 수취 계좌)
   static const bankAccountInfo = '국민은행 91102204374 (예금주: 신규리)';
+
+  /// 서비스 웹 주소 — 앱 웹뷰 결제 브릿지 페이지(pay.html)가 여기서 서빙된다.
+  static const webBaseUrl = String.fromEnvironment(
+    'WEB_BASE_URL',
+    defaultValue: 'https://shop.orange-man.xyz',
+  );
 
   /// 토스페이먼츠 클라이언트 키 (기본값은 공개 문서용 테스트 키).
   /// 운영 전환 시 --dart-define=TOSS_CLIENT_KEY=live_ck_... 로 교체.

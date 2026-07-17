@@ -92,13 +92,15 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       ref.invalidate(myOrdersProvider);
 
       if (_paymentMethod == 'card') {
-        // 결제창 성공 시 /payment/success로 전체 페이지 리다이렉트되므로
-        // 이 아래는 사용자가 결제창을 닫았을 때만 실행된다.
+        // 웹: 결제창 성공 시 /payment/success로 전체 페이지 리다이렉트 (반환 없음)
+        // 앱: 웹뷰 결제 후 승인 파라미터가 반환되어 여기서 승인까지 처리
         final order = await repo.fetchOrder(orderId);
         if (order == null) throw Exception('주문을 찾을 수 없습니다.');
         final firstTitle = orderable.first.product?.title ?? '상품';
         try {
-          await requestCardPayment(
+          if (!mounted) return;
+          final result = await requestCardPayment(
+            context: context,
             orderNumber: order.orderNumber,
             orderName: orderable.length > 1
                 ? '$firstTitle 외 ${orderable.length - 1}건'
@@ -106,6 +108,16 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
             amount: order.totalAmount,
             customerName: _receiverName.text.trim(),
           );
+          if (result != null) {
+            final paidOrderId = await repo.confirmCardPayment(
+              orderNumber: result.orderNumber,
+              paymentKey: result.paymentKey,
+              amount: result.amount,
+            );
+            ref.invalidate(myOrdersProvider);
+            if (!mounted) return;
+            context.go('/orders/$paidOrderId?placed=1');
+          }
         } on PaymentCancelled {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -271,13 +283,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                   ],
                                 ),
                               ),
-                            RadioListTile<String>(
+                            const RadioListTile<String>(
                               value: 'card',
-                              title: const Text('카드결제'),
-                              subtitle: cardPaymentSupported
-                                  ? const Text('토스페이먼츠 결제창으로 결제합니다')
-                                  : const Text('앱에서는 준비 중이에요. 웹에서 이용해 주세요.'),
-                              enabled: cardPaymentSupported,
+                              title: Text('카드결제'),
+                              subtitle: Text('토스페이먼츠 결제창으로 결제합니다'),
                             ),
                           ],
                         ),

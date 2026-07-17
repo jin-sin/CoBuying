@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!-- 앱(웹뷰) 전용 토스 결제창 브릿지 페이지.
+     쿼리: ck(클라이언트 키), orderId(주문번호), orderName, amount, customerName
+     결과는 /pay-success.html 또는 /pay-fail.html 로 리다이렉트되고
+     앱 웹뷰가 이를 가로채 승인 RPC를 호출한다. -->
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제</title>
+  <script src="https://js.tosspayments.com/v1/payment"></script>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding-top: 40vh; color: #666;">
+  결제창을 여는 중입니다...
+  <script>
+    var p = new URLSearchParams(location.search);
+    function fail(code, message) {
+      location.href = location.origin + '/pay-fail.html?code=' +
+        encodeURIComponent(code || '') + '&message=' + encodeURIComponent(message || '');
+    }
+    try {
+      TossPayments(p.get('ck')).requestPayment('카드', {
+        amount: Number(p.get('amount')),
+        orderId: p.get('orderId'),
+        orderName: p.get('orderName') || '주문',
+        customerName: p.get('customerName') || '',
+        successUrl: location.origin + '/pay-success.html',
+        failUrl: location.origin + '/pay-fail.html'
+      }).catch(function (e) {
+        fail(e && e.code, (e && e.message) || '결제가 취소되었습니다');
+      });
+    } catch (e) {
+      fail('INIT_ERROR', String(e));
+    }
+  </script>
+</body>
+</html>

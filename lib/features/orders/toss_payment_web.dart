@@ -1,6 +1,8 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:flutter/widgets.dart';
+
 import '../../core/env.dart';
 import 'toss_payment.dart';
 
@@ -8,7 +10,9 @@ const cardPaymentSupported = true;
 
 /// 토스 결제창(v1)을 연다. 결제 완료/실패 시 /payment/success·/payment/fail로
 /// 전체 페이지 리다이렉트되고, 사용자가 창을 닫으면 [PaymentCancelled]를 던진다.
-Future<void> requestCardPayment({
+/// (리다이렉트 방식이라 성공 시 반환값 없이 페이지가 넘어간다 — 항상 null)
+Future<CardPaymentResult?> requestCardPayment({
+  required BuildContext context, // 웹에서는 사용하지 않음 (앱 웹뷰용)
   required String orderNumber,
   required String orderName,
   required int amount,
@@ -42,4 +46,5 @@ Future<void> requestCardPayment({
     }
     rethrow;
   }
+  return null;
 }

@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart'
+    show KakaoSdk;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/env.dart';
@@ -12,6 +15,11 @@ import 'router/app_router.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   captureLaunchQueryParams();
+
+  // 앱 전용: 카카오톡 앱 전환 로그인용 네이티브 SDK (웹은 Supabase OAuth 사용)
+  if (!kIsWeb) {
+    KakaoSdk.init(nativeAppKey: Env.kakaoNativeAppKey);
+  }
 
   await initializeDateFormatting('ko_KR');
   await Supabase.initialize(

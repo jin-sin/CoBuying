@@ -14,6 +14,21 @@
 				<string>io.cobuying</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- 카카오 네이티브 로그인 복귀 스킴 (kakao + 네이티브 앱 키) -->
+				<string>kakao787ca823fe97b63bea5d8163315c14c0</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<!-- 카카오톡 설치 여부 확인/앱 전환 로그인용 -->
+		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Cobuying</string>

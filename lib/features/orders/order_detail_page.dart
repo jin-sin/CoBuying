@@ -89,13 +89,14 @@ class _OrderDetail extends ConsumerWidget {
     }
   }
 
-  /// 결제창을 닫고 나온 카드 주문의 재결제. 성공 시 페이지가
-  /// /payment/success로 리다이렉트되므로 이후 코드는 취소 시에만 실행된다.
-  Future<void> _retryCardPayment(BuildContext context) async {
+  /// 결제창을 닫고 나온 카드 주문의 재결제.
+  /// 웹: 성공 시 /payment/success로 리다이렉트. 앱: 반환값으로 여기서 승인.
+  Future<void> _retryCardPayment(BuildContext context, WidgetRef ref) async {
     final firstTitle =
         order.items.isNotEmpty ? order.items.first.productTitle : '상품';
     try {
-      await requestCardPayment(
+      final result = await requestCardPayment(
+        context: context,
         orderNumber: order.orderNumber,
         orderName: order.items.length > 1
             ? '$firstTitle 외 ${order.items.length - 1}건'
@@ -103,6 +104,19 @@ class _OrderDetail extends ConsumerWidget {
         amount: order.totalAmount,
         customerName: order.receiverName,
       );
+      if (result != null) {
+        await ref.read(ordersRepositoryProvider).confirmCardPayment(
+              orderNumber: result.orderNumber,
+              paymentKey: result.paymentKey,
+              amount: result.amount,
+            );
+        ref.invalidate(orderProvider(order.id));
+        ref.invalidate(myOrdersProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('결제가 완료되었습니다.')));
+        }
+      }
     } on PaymentCancelled {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
@@ -206,7 +220,7 @@ class _OrderDetail extends ConsumerWidget {
               const SizedBox(height: 24),
               FilledButton.icon(
                 icon: const Icon(Icons.credit_card),
-                onPressed: () => _retryCardPayment(context),
+                onPressed: () => _retryCardPayment(context, ref),
                 label: const Text('카드 결제하기'),
               ),
               const SizedBox(height: 4),

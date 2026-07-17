@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'auth_providers.dart';
 
@@ -17,6 +18,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     setState(() => _busy = true);
     try {
       await action();
+      // 앱 네이티브 로그인은 페이지 리다이렉트 없이 세션이 생기므로 명시적으로
+      // 이동한다. (웹 OAuth는 이 시점에 아직 세션이 없어 그냥 지나간다)
+      if (mounted && ref.read(authRepositoryProvider).currentUser != null) {
+        final from =
+            GoRouterState.of(context).uri.queryParameters['from'];
+        context.go(from ?? '/');
+        return;
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
