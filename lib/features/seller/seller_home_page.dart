@@ -8,6 +8,7 @@ import '../products/products_providers.dart';
 import 'seller_apply_page.dart';
 import 'seller_profile.dart';
 import 'seller_providers.dart';
+import 'shipping_list_page.dart';
 
 /// 셀러센터.
 /// - 셀러 미신청: 입점 신청 폼
@@ -189,8 +190,29 @@ class _MySalesTab extends ConsumerWidget {
               ])
             : ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: items.length,
-                itemBuilder: (context, i) {
+                // 첫 칸은 배송 목록(택배 발송용 표) 진입 버튼
+                itemCount: items.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    final pendingCount = items
+                        .where((e) =>
+                            !const {'pending_payment', 'cancelled'}
+                                .contains(e.$2.status) &&
+                            e.$1.status == 'preparing')
+                        .length;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.local_shipping_outlined),
+                        label: Text('배송 목록 보기 (미발송 $pendingCount건)'),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const ShippingListPage()),
+                        ),
+                      ),
+                    );
+                  }
+                  final i = index - 1;
                   final (item, order) = items[i];
                   // 결제 완료 이후에만 셀러가 배송 단계를 진행할 수 있다.
                   final canShip = const {
