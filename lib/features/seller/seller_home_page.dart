@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../orders/orders_providers.dart';
 import '../products/products_providers.dart';
 import 'seller_apply_page.dart';
 import 'seller_profile.dart';
@@ -191,29 +192,80 @@ class _MySalesTab extends ConsumerWidget {
                 itemCount: items.length,
                 itemBuilder: (context, i) {
                   final (item, order) = items[i];
+                  // 결제 완료 이후에만 셀러가 배송 단계를 진행할 수 있다.
+                  final canShip = const {
+                    'paid', 'preparing', 'shipped', 'delivered',
+                  }.contains(order.status);
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      title: Text('${item.productTitle} × ${item.quantity}'),
-                      subtitle: Text(
-                          '${order.orderNumber} · ${formatDateTime(order.createdAt)}\n'
-                          '${order.receiverName} · ${order.address1} ${order.address2}'),
-                      isThreeLine: true,
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(formatWon(item.sellerPayout),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold)),
-                          Text(order.statusLabel,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primary)),
-                        ],
-                      ),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          title: Text('${item.productTitle} × ${item.quantity}'),
+                          subtitle: Text(
+                              '${order.orderNumber} · ${formatDateTime(order.createdAt)}\n'
+                              '${order.receiverName} · ${order.address1} ${order.address2}'),
+                          isThreeLine: true,
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(formatWon(item.sellerPayout),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              Text(canShip ? item.statusLabel : order.statusLabel,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: canShip
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                          : Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        if (canShip && item.id != null)
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: Row(
+                              children: [
+                                const Text('배송 상태: '),
+                                const SizedBox(width: 8),
+                                DropdownButton<String>(
+                                  value: item.status,
+                                  items: const [
+                                    DropdownMenuItem(
+                                        value: 'preparing',
+                                        child: Text('준비중')),
+                                    DropdownMenuItem(
+                                        value: 'shipped',
+                                        child: Text('배송중')),
+                                    DropdownMenuItem(
+                                        value: 'delivered',
+                                        child: Text('배송 완료')),
+                                  ],
+                                  onChanged: (s) async {
+                                    if (s == null || s == item.status) return;
+                                    try {
+                                      await ref
+                                          .read(ordersRepositoryProvider)
+                                          .updateItemStatus(item.id!, s);
+                                      ref.invalidate(mySalesProvider);
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(SnackBar(
+                                                content:
+                                                    Text('변경에 실패했습니다: $e')));
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },

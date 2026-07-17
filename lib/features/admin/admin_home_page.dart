@@ -234,17 +234,41 @@ class _AdminProductsTab extends ConsumerWidget {
 class _AdminOrdersTab extends ConsumerWidget {
   const _AdminOrdersTab();
 
-  static const _statusFlow = [
-    'pending_payment', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled',
-  ];
-  static const _statusLabels = {
-    'pending_payment': '입금 대기',
-    'paid': '결제 완료',
-    'preparing': '상품 준비중',
-    'shipped': '배송중',
-    'delivered': '배송 완료',
-    'cancelled': '취소됨',
-  };
+  Future<void> _updateStatus(BuildContext context, WidgetRef ref,
+      String orderId, String status) async {
+    try {
+      await ref.read(ordersRepositoryProvider).updateStatus(orderId, status);
+      ref.invalidate(allOrdersProvider);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('변경에 실패했습니다: $e')));
+      }
+    }
+  }
+
+  Future<void> _cancelOrder(
+      BuildContext context, WidgetRef ref, String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('주문 취소'),
+        content: const Text('이 주문을 취소할까요?\n상품 재고는 자동으로 복원됩니다.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('아니요')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('주문 취소')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (context.mounted) {
+      await _updateStatus(context, ref, orderId, 'cancelled');
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -276,8 +300,9 @@ class _AdminOrdersTab extends ConsumerWidget {
                     ListTile(
                       dense: true,
                       title: Text(item.productTitle),
-                      trailing:
-                          Text('${item.quantity}개 · ${formatWon(item.lineTotal)}'),
+                      trailing: Text(
+                          '${item.quantity}개 · ${formatWon(item.lineTotal)}'
+                          '${o.status == 'pending_payment' || o.status == 'cancelled' ? '' : ' · ${item.statusLabel}'}'),
                     ),
                   ListTile(
                     dense: true,
@@ -285,25 +310,40 @@ class _AdminOrdersTab extends ConsumerWidget {
                     subtitle: Text('${o.address1} ${o.address2}'),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('상태 변경: '),
-                        const SizedBox(width: 8),
-                        DropdownButton<String>(
-                          value: o.status,
-                          items: [
-                            for (final s in _statusFlow)
-                              DropdownMenuItem(
-                                  value: s, child: Text(_statusLabels[s]!)),
+                        if (o.status != 'pending_payment' &&
+                            o.status != 'cancelled')
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8),
+                            child: Text(
+                                '배송 단계(준비중→배송중→배송 완료)는 셀러가 셀러센터에서 변경합니다.',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 12)),
+                          ),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            if (o.status == 'pending_payment')
+                              FilledButton(
+                                onPressed: () => _updateStatus(
+                                    context, ref, o.id, 'paid'),
+                                child: const Text('입금 확인'),
+                              ),
+                            if (const {
+                              'pending_payment', 'paid', 'preparing',
+                            }.contains(o.status))
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                    foregroundColor:
+                                        Theme.of(context).colorScheme.error),
+                                onPressed: () =>
+                                    _cancelOrder(context, ref, o.id),
+                                child: const Text('주문 취소'),
+                              ),
                           ],
-                          onChanged: (s) async {
-                            if (s == null || s == o.status) return;
-                            await ref
-                                .read(ordersRepositoryProvider)
-                                .updateStatus(o.id, s);
-                            ref.invalidate(allOrdersProvider);
-                          },
                         ),
                       ],
                     ),

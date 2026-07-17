@@ -69,12 +69,15 @@ class OrderItem {
     required this.productTitle,
     required this.unitPrice,
     required this.quantity,
+    this.id,
     this.productId,
     this.sellerId,
     this.commissionRate = 0,
     this.feeAmount = 0,
+    this.status = 'preparing',
   });
 
+  final String? id;
   final String? productId;
   final String? sellerId;
   final String productTitle;
@@ -82,13 +85,22 @@ class OrderItem {
   final int quantity;
   final double commissionRate; // 주문 시점 수수료율 (%)
   final int feeAmount; // 플랫폼 수수료 (원)
+  final String status; // 아이템별 배송 상태 (셀러가 관리)
 
   int get lineTotal => unitPrice * quantity;
 
   /// 셀러 입장에서의 정산 금액
   int get sellerPayout => lineTotal - feeAmount;
 
+  String get statusLabel => switch (status) {
+        'preparing' => '준비중',
+        'shipped' => '배송중',
+        'delivered' => '배송 완료',
+        _ => status,
+      };
+
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
+        id: json['id'] as String?,
         productId: json['product_id'] as String?,
         sellerId: json['seller_id'] as String?,
         productTitle: json['product_title'] as String,
@@ -96,5 +108,6 @@ class OrderItem {
         quantity: json['quantity'] as int,
         commissionRate: (json['commission_rate'] as num? ?? 0).toDouble(),
         feeAmount: (json['fee_amount'] as num? ?? 0).toInt(),
+        status: json['status'] as String? ?? 'preparing',
       );
 }

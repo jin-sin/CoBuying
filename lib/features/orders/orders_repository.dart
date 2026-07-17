@@ -72,6 +72,15 @@ class OrdersRepository {
     return rows.map(Order.fromJson).toList();
   }
 
+  /// 셀러용: 자기 주문 아이템의 배송 상태 변경.
+  /// 서버 RPC가 소유 검증과 주문 전체 상태 재계산을 처리한다.
+  Future<void> updateItemStatus(String itemId, String status) async {
+    await _client.rpc('update_item_status', params: {
+      'p_item_id': itemId,
+      'p_status': status,
+    });
+  }
+
   /// 관리자용: 주문 상태 변경 (입금 확인 등)
   Future<void> updateStatus(String orderId, String status) async {
     await _client

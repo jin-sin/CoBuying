@@ -138,7 +138,10 @@ class _OrderDetail extends ConsumerWidget {
               title: '주문 상품',
               children: [
                 for (final item in order.items)
-                  _row('${item.productTitle} × ${item.quantity}',
+                  _row(
+                      '${item.productTitle} × ${item.quantity}'
+                      // 결제 완료 이후에는 상품별 배송 상태 표시 (셀러별로 다를 수 있음)
+                      '${order.status == 'pending_payment' || order.status == 'cancelled' ? '' : ' · ${item.statusLabel}'}',
                       formatWon(item.lineTotal)),
                 const Divider(),
                 _row('총 결제금액', formatWon(order.totalAmount), bold: true),

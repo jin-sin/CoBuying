@@ -555,3 +555,55 @@ select cron.schedule(
        and payment_method = 'bank_transfer'
        and created_at < now() - interval '24 hours' $$
 );
+
+-- ------------------------------------------------------------
+-- 14. 배송 상태 — 셀러가 자기 주문 아이템 단위로 관리
+--     한 주문에 여러 셀러 상품이 섞일 수 있으므로 배송 상태는
+--     아이템 단위이고, 주문 전체 상태는 가장 느린 단계로 자동 계산.
+--     역할: 관리자 = 입금 확인·취소 / 셀러 = 배송 단계 진행
+-- ------------------------------------------------------------
+alter table public.order_items
+  add column if not exists status text not null default 'preparing'
+    check (status in ('preparing', 'shipped', 'delivered'));
+
+create or replace function public.update_item_status(p_item_id uuid, p_status text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_item  public.order_items%rowtype;
+  v_order public.orders%rowtype;
+  v_stage integer;
+begin
+  if p_status not in ('preparing', 'shipped', 'delivered') then
+    raise exception '허용되지 않는 배송 상태입니다: %', p_status;
+  end if;
+
+  select * into v_item from public.order_items where id = p_item_id;
+  if not found or (v_item.seller_id <> auth.uid() and not public.is_admin()) then
+    raise exception '본인 판매 상품만 변경할 수 있습니다.';
+  end if;
+
+  -- 주문 행 잠금: 여러 셀러가 동시에 변경해도 재계산이 꼬이지 않게
+  select * into v_order from public.orders where id = v_item.order_id for update;
+  if v_order.status in ('pending_payment', 'cancelled') then
+    raise exception '결제 완료된 주문만 배송 상태를 변경할 수 있습니다.';
+  end if;
+
+  update public.order_items set status = p_status where id = p_item_id;
+
+  -- 주문 상태 = 아이템들 중 가장 느린 배송 단계
+  select min(case status when 'preparing' then 1 when 'shipped' then 2 else 3 end)
+    into v_stage
+  from public.order_items
+  where order_id = v_item.order_id;
+
+  update public.orders
+  set status = case v_stage when 1 then 'preparing'
+                            when 2 then 'shipped'
+                            else 'delivered' end,
+      updated_at = now()
+  where id = v_item.order_id;
+end;
+$$;
