@@ -31,8 +31,18 @@
 
   <title>공동구매</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- 토스페이먼츠 결제창 SDK (v1) -->
+  <script src="https://js.tosspayments.com/v1/payment"></script>
 </head>
 <body>
+  <script>
+    // 이전 배포가 등록해 둔 서비스 워커 해제 — 배포 직후에도 항상 최신 버전이 뜨게
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations()
+        .then(function (rs) { rs.forEach(function (r) { r.unregister(); }); });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -17,7 +17,10 @@ fi
 cd "$(dirname "$0")/.."
 
 echo "▶ Flutter 웹 릴리즈 빌드..."
+# --pwa-strategy=none: 서비스 워커 캐시가 배포 직후에도 이전 버전을
+# 내보내는 문제 방지 (새로고침하면 항상 최신 버전)
 flutter build web --release \
+  --pwa-strategy=none \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$ANON_KEY"
 

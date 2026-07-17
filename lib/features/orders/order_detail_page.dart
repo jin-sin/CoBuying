@@ -6,6 +6,7 @@ import '../../core/env.dart';
 import '../../core/formatters.dart';
 import 'order.dart';
 import 'orders_providers.dart';
+import 'toss_payment.dart';
 
 class OrderDetailPage extends ConsumerWidget {
   const OrderDetailPage({
@@ -84,6 +85,33 @@ class _OrderDetail extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('취소에 실패했습니다: $e')));
+      }
+    }
+  }
+
+  /// 결제창을 닫고 나온 카드 주문의 재결제. 성공 시 페이지가
+  /// /payment/success로 리다이렉트되므로 이후 코드는 취소 시에만 실행된다.
+  Future<void> _retryCardPayment(BuildContext context) async {
+    final firstTitle =
+        order.items.isNotEmpty ? order.items.first.productTitle : '상품';
+    try {
+      await requestCardPayment(
+        orderNumber: order.orderNumber,
+        orderName: order.items.length > 1
+            ? '$firstTitle 외 ${order.items.length - 1}건'
+            : firstTitle,
+        amount: order.totalAmount,
+        customerName: order.receiverName,
+      );
+    } on PaymentCancelled {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('결제를 취소했어요.')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('결제에 실패했습니다: $e')));
       }
     }
   }
@@ -168,6 +196,22 @@ class _OrderDetail extends ConsumerWidget {
               OutlinedButton(
                 onPressed: () => context.go('/orders'),
                 child: const Text('주문 내역 보기'),
+              ),
+            ],
+            if (order.status == 'pending_payment' &&
+                order.paymentMethod == 'card' &&
+                cardPaymentSupported) ...[
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                icon: const Icon(Icons.credit_card),
+                onPressed: () => _retryCardPayment(context),
+                label: const Text('카드 결제하기'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '1시간 내 결제하지 않으면 주문이 자동 취소됩니다.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall,
               ),
             ],
             if (order.status == 'pending_payment') ...[

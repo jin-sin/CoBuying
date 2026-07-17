@@ -32,7 +32,7 @@ class Order {
   final List<OrderItem> items;
 
   String get statusLabel => switch (status) {
-        'pending_payment' => '입금 대기',
+        'pending_payment' => paymentMethod == 'card' ? '결제 대기' : '입금 대기',
         'paid' => '결제 완료',
         'preparing' => '상품 준비중',
         'shipped' => '배송중',

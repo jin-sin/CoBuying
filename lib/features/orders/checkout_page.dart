@@ -8,6 +8,8 @@ import '../../core/env.dart';
 import '../../core/formatters.dart';
 import '../cart/cart_providers.dart';
 import 'orders_providers.dart';
+import 'postcode_fix.dart';
+import 'toss_payment.dart';
 
 class CheckoutPage extends ConsumerStatefulWidget {
   const CheckoutPage({super.key});
@@ -42,12 +44,14 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
 
   /// 카카오 우편번호 서비스로 주소 검색 (postal_ko)
   Future<void> _searchAddress() async {
+    beginPostcodeCapture(); // 웹에서 우편번호가 빈 값으로 오는 패키지 버그 보정
     final result = await Navigator.of(context).push<Kpostal>(
       MaterialPageRoute(builder: (_) => KpostalView()),
     );
     if (result == null) return;
     setState(() {
-      _postcode.text = result.postCode;
+      _postcode.text =
+          result.postCode.isNotEmpty ? result.postCode : lastSearchedPostCode;
       _address1.text =
           result.roadAddress.isNotEmpty ? result.roadAddress : result.address;
     });
@@ -56,15 +60,17 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final items = (ref.read(cartProvider).value ?? [])
-        .where((i) => i.isOrderable)
+    final orderable =
+        (ref.read(cartProvider).value ?? []).where((i) => i.isOrderable).toList();
+    final items = orderable
         .map((i) => (productId: i.productId, quantity: i.quantity))
         .toList();
     if (items.isEmpty) return;
 
     setState(() => _submitting = true);
     try {
-      final orderId = await ref.read(ordersRepositoryProvider).createOrder(
+      final repo = ref.read(ordersRepositoryProvider);
+      final orderId = await repo.createOrder(
             paymentMethod: _paymentMethod,
             receiverName: _receiverName.text.trim(),
             receiverPhone: _receiverPhone.text.trim(),
@@ -78,11 +84,34 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
             items: items,
           );
 
-      // TODO(PG): 카드결제 선택 시 여기서 토스페이먼츠 등 PG 결제창 호출 후
-      // 결제 승인 콜백에서 주문 상태를 'paid'로 변경하는 흐름으로 확장.
-
       ref.invalidate(cartProvider);
       ref.invalidate(myOrdersProvider);
+
+      if (_paymentMethod == 'card') {
+        // 결제창 성공 시 /payment/success로 전체 페이지 리다이렉트되므로
+        // 이 아래는 사용자가 결제창을 닫았을 때만 실행된다.
+        final order = await repo.fetchOrder(orderId);
+        if (order == null) throw Exception('주문을 찾을 수 없습니다.');
+        final firstTitle = orderable.first.product?.title ?? '상품';
+        try {
+          await requestCardPayment(
+            orderNumber: order.orderNumber,
+            orderName: orderable.length > 1
+                ? '$firstTitle 외 ${orderable.length - 1}건'
+                : firstTitle,
+            amount: order.totalAmount,
+            customerName: _receiverName.text.trim(),
+          );
+        } on PaymentCancelled {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('결제를 취소했어요. 주문 상세에서 다시 결제할 수 있습니다.')));
+          context.go('/orders/$orderId');
+          return;
+        }
+        return;
+      }
+
       if (!mounted) return;
       context.go('/orders/$orderId?placed=1');
     } catch (e) {
@@ -235,9 +264,13 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                   ],
                                 ),
                               ),
-                            const RadioListTile<String>(
+                            RadioListTile<String>(
                               value: 'card',
-                              title: Text('카드결제 (PG 연동 준비중)'),
+                              title: const Text('카드결제'),
+                              subtitle: cardPaymentSupported
+                                  ? const Text('토스페이먼츠 결제창으로 결제합니다')
+                                  : const Text('앱에서는 준비 중이에요. 웹에서 이용해 주세요.'),
+                              enabled: cardPaymentSupported,
                             ),
                           ],
                         ),

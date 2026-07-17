@@ -6,10 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/env.dart';
 import 'core/theme.dart';
+import 'features/orders/payment_result_page.dart';
 import 'router/app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  captureLaunchQueryParams();
 
   await initializeDateFormatting('ko_KR');
   await Supabase.initialize(

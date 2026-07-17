@@ -12,12 +12,13 @@ import '../features/cart/cart_page.dart';
 import '../features/orders/checkout_page.dart';
 import '../features/orders/order_detail_page.dart';
 import '../features/orders/order_list_page.dart';
+import '../features/orders/payment_result_page.dart';
 import '../features/products/product_detail_page.dart';
 import '../features/products/product_list_page.dart';
 import '../features/seller/seller_home_page.dart';
 
 /// 로그인이 필요한 경로
-const _authRequired = {'/cart', '/checkout', '/orders', '/seller'};
+const _authRequired = {'/cart', '/checkout', '/orders', '/seller', '/payment'};
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRepo = ref.watch(authRepositoryProvider);
@@ -56,6 +57,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           orderId: state.pathParameters['id']!,
           justPlaced: state.uri.queryParameters['placed'] == '1',
         ),
+      ),
+      // 토스 결제창 리다이렉트 진입점. 토스는 쿼리를 프래그먼트 앞에 붙이므로
+      // (/?paymentKey=...#/payment/success) 실제 주소창 쿼리(Uri.base)도 함께 읽는다.
+      GoRoute(
+        path: '/payment/success',
+        builder: (_, state) => PaymentSuccessPage(params: {
+          ...launchQueryParams,
+          ...Uri.base.queryParameters,
+          ...state.uri.queryParameters,
+        }),
+      ),
+      GoRoute(
+        path: '/payment/fail',
+        builder: (_, state) => PaymentFailPage(params: {
+          ...launchQueryParams,
+          ...Uri.base.queryParameters,
+          ...state.uri.queryParameters,
+        }),
       ),
       GoRoute(path: '/seller', builder: (_, _) => const SellerHomePage()),
       GoRoute(

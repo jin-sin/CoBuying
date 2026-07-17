@@ -607,3 +607,167 @@ begin
   where id = v_item.order_id;
 end;
 $$;
+
+-- ------------------------------------------------------------
+-- 15. 카드결제 (토스페이먼츠) — 승인은 서버(DB)에서 처리
+--     클라이언트가 결제창 성공 리다이렉트로 받은 paymentKey를
+--     confirm_card_payment RPC로 전달하면, DB가 http 확장으로
+--     토스 승인 API를 호출해 금액 검증 후 주문을 paid로 바꾼다.
+--     시크릿 키는 private 스키마에 저장 (PostgREST 비노출).
+-- ------------------------------------------------------------
+create extension if not exists http with schema extensions;
+
+create schema if not exists private;
+
+create table if not exists private.app_secrets (
+  key   text primary key,
+  value text not null
+);
+
+-- 토스페이먼츠 시크릿 키. 아래는 공개 문서용 테스트 키 —
+-- 운영 전환 시 개발자센터 라이브 키로 update 할 것.
+insert into private.app_secrets (key, value)
+values ('toss_secret_key', 'test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R')
+on conflict (key) do nothing;
+
+-- 결제 승인 기록
+create table if not exists public.payments (
+  id          uuid primary key default gen_random_uuid(),
+  order_id    uuid not null unique references public.orders (id) on delete restrict,
+  payment_key text not null unique,
+  amount      integer not null,
+  method      text not null default '',
+  status      text not null default '',
+  approved_at timestamptz,
+  receipt_url text,
+  raw         jsonb,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.payments enable row level security;
+
+drop policy if exists "payments_select" on public.payments;
+create policy "payments_select" on public.payments
+  for select using (
+    public.is_admin() or exists (
+      select 1 from public.orders o
+      where o.id = order_id and o.user_id = auth.uid()
+    )
+  );
+-- insert/update 정책 없음 — confirm_card_payment RPC(security definer)만 기록
+
+create or replace function public.confirm_card_payment(
+  p_order_number text,
+  p_payment_key  text,
+  p_amount       integer
+)
+returns uuid
+language plpgsql
+security definer set search_path = public, extensions
+as $fn$
+declare
+  v_order  public.orders%rowtype;
+  v_secret text;
+  v_cred   text;
+  v_resp   http_response;
+  v_json   jsonb;
+begin
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+
+  select * into v_order
+  from public.orders
+  where order_number = p_order_number and user_id = auth.uid()
+  for update;
+
+  if not found then
+    raise exception '주문을 찾을 수 없습니다.';
+  end if;
+  if v_order.payment_method <> 'card' then
+    raise exception '카드결제 주문이 아닙니다.';
+  end if;
+
+  -- 성공 페이지 새로고침 등 중복 진입: 이미 같은 결제로 승인됐으면 성공 처리
+  if v_order.status <> 'pending_payment' then
+    if exists (select 1 from public.payments
+               where order_id = v_order.id and payment_key = p_payment_key) then
+      return v_order.id;
+    end if;
+    raise exception '결제 대기 상태의 주문이 아닙니다. (현재: %)', v_order.status;
+  end if;
+
+  -- 서버 저장 금액과 대조 — 클라이언트/리다이렉트 파라미터는 신뢰하지 않는다
+  if v_order.total_amount <> p_amount then
+    raise exception '결제 금액이 주문 금액과 다릅니다.';
+  end if;
+
+  select value into v_secret from private.app_secrets where key = 'toss_secret_key';
+  if v_secret is null then
+    raise exception '결제 설정이 없습니다. 관리자에게 문의하세요.';
+  end if;
+  v_cred := replace(encode(convert_to(v_secret || ':', 'utf8'), 'base64'), E'\n', '');
+
+  perform http_set_curlopt('CURLOPT_TIMEOUT', '10');
+
+  v_resp := http((
+    'POST',
+    'https://api.tosspayments.com/v1/payments/confirm',
+    array[http_header('Authorization', 'Basic ' || v_cred)],
+    'application/json',
+    jsonb_build_object(
+      'paymentKey', p_payment_key,
+      'orderId',    p_order_number,
+      'amount',     p_amount
+    )::text
+  )::http_request);
+
+  v_json := v_resp.content::jsonb;
+
+  -- 승인은 됐지만 DB 반영 전에 끊긴 재시도: 조회 API로 검증 후 통과
+  if v_resp.status <> 200 and v_json ->> 'code' = 'ALREADY_PROCESSED_PAYMENT' then
+    v_resp := http((
+      'GET',
+      'https://api.tosspayments.com/v1/payments/' || p_payment_key,
+      array[http_header('Authorization', 'Basic ' || v_cred)],
+      null, null
+    )::http_request);
+    v_json := v_resp.content::jsonb;
+    if v_resp.status <> 200 or v_json ->> 'status' <> 'DONE'
+       or v_json ->> 'orderId' <> p_order_number
+       or (v_json ->> 'totalAmount')::integer <> p_amount then
+      raise exception '결제 승인에 실패했습니다: %',
+        coalesce(v_json ->> 'message', '알 수 없는 오류');
+    end if;
+  elsif v_resp.status <> 200 then
+    raise exception '결제 승인에 실패했습니다: %',
+      coalesce(v_json ->> 'message', 'HTTP ' || v_resp.status::text);
+  end if;
+
+  insert into public.payments
+    (order_id, payment_key, amount, method, status, approved_at, receipt_url, raw)
+  values
+    (v_order.id, p_payment_key, p_amount,
+     coalesce(v_json ->> 'method', ''),
+     coalesce(v_json ->> 'status', ''),
+     nullif(v_json ->> 'approvedAt', '')::timestamptz,
+     v_json -> 'receipt' ->> 'url',
+     v_json);
+
+  update public.orders
+  set status = 'paid', updated_at = now()
+  where id = v_order.id;
+
+  return v_order.id;
+end;
+$fn$;
+
+-- 결제창까지 갔다가 이탈한 카드 주문은 1시간 후 자동 취소 (재고 복원은 취소 트리거)
+select cron.schedule(
+  'expire-unpaid-card-orders',
+  '*/10 * * * *',
+  $$ update public.orders set status = 'cancelled', updated_at = now()
+     where status = 'pending_payment'
+       and payment_method = 'card'
+       and created_at < now() - interval '1 hour' $$
+);

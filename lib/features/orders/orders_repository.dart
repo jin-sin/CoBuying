@@ -37,6 +37,21 @@ class OrdersRepository {
     return orderId as String;
   }
 
+  /// 카드결제 승인. 서버 RPC가 금액 검증 후 토스 승인 API를 호출하고
+  /// 주문을 paid로 바꾼다. 승인된 주문의 uuid를 돌려준다.
+  Future<String> confirmCardPayment({
+    required String orderNumber,
+    required String paymentKey,
+    required int amount,
+  }) async {
+    final orderId = await _client.rpc('confirm_card_payment', params: {
+      'p_order_number': orderNumber,
+      'p_payment_key': paymentKey,
+      'p_amount': amount,
+    });
+    return orderId as String;
+  }
+
   Future<List<Order>> fetchMyOrders() async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
