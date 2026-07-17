@@ -12,13 +12,16 @@ import '../features/cart/cart_page.dart';
 import '../features/orders/checkout_page.dart';
 import '../features/orders/order_detail_page.dart';
 import '../features/orders/order_list_page.dart';
+import '../features/notifications/notifications_page.dart';
 import '../features/orders/payment_result_page.dart';
 import '../features/products/product_detail_page.dart';
 import '../features/products/product_list_page.dart';
 import '../features/seller/seller_home_page.dart';
 
 /// 로그인이 필요한 경로
-const _authRequired = {'/cart', '/checkout', '/orders', '/seller', '/payment'};
+const _authRequired = {
+  '/cart', '/checkout', '/orders', '/seller', '/payment', '/notifications',
+};
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRepo = ref.watch(authRepositoryProvider);
@@ -76,6 +79,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           ...state.uri.queryParameters,
         }),
       ),
+      GoRoute(
+          path: '/notifications',
+          builder: (_, _) => const NotificationsPage()),
       GoRoute(path: '/seller', builder: (_, _) => const SellerHomePage()),
       GoRoute(
           path: '/seller/product/new',

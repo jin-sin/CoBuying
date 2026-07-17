@@ -945,3 +945,105 @@ with (security_invoker = true) as
   where status = 'active'
     and starts_at <= now()
     and ends_at > now();
+
+-- ------------------------------------------------------------
+-- 19. 인앱 알림
+--     주문 상태 변경 트리거가 구매자/셀러 알림을 자동 생성한다.
+--     클라이언트는 Realtime 스트림으로 구독 (배지 실시간 갱신).
+-- ------------------------------------------------------------
+create table if not exists public.notifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  title      text not null,
+  body       text not null default '',
+  link       text not null default '',   -- 탭하면 이동할 앱 라우트
+  read_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_notifications_user
+  on public.notifications (user_id, created_at desc);
+
+alter table public.notifications enable row level security;
+
+drop policy if exists "notifications_select" on public.notifications;
+create policy "notifications_select" on public.notifications
+  for select using (user_id = auth.uid());
+drop policy if exists "notifications_update" on public.notifications;
+create policy "notifications_update" on public.notifications
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- insert 정책 없음 — 트리거(security definer)만 생성
+
+-- Realtime 발행 대상에 추가 (이미 있으면 무시)
+do $$
+begin
+  alter publication supabase_realtime add table public.notifications;
+exception when duplicate_object then null;
+end $$;
+
+create or replace function public.notify_order_events()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_seller record;
+begin
+  if new.status is not distinct from old.status then
+    return new;
+  end if;
+
+  if new.status = 'paid' then
+    insert into public.notifications (user_id, title, body, link) values
+      (new.user_id, '결제가 확인되었습니다',
+       '주문 ' || new.order_number || ' 결제가 확인되었습니다. 판매자가 곧 배송을 준비합니다.',
+       '/orders/' || new.id);
+    for v_seller in
+      select distinct seller_id from public.order_items where order_id = new.id
+    loop
+      insert into public.notifications (user_id, title, body, link) values
+        (v_seller.seller_id, '새 주문이 들어왔습니다',
+         '주문 ' || new.order_number || ' 결제가 완료되었습니다. 배송 목록을 확인해 주세요.',
+         '/seller');
+    end loop;
+
+  elsif new.status = 'shipped' then
+    insert into public.notifications (user_id, title, body, link) values
+      (new.user_id, '상품이 발송되었습니다',
+       '주문 ' || new.order_number || ' 상품이 모두 발송되었습니다.',
+       '/orders/' || new.id);
+
+  elsif new.status = 'delivered' then
+    insert into public.notifications (user_id, title, body, link) values
+      (new.user_id, '배송이 완료되었습니다',
+       '주문 ' || new.order_number || ' 배송이 완료되었습니다.',
+       '/orders/' || new.id);
+
+  elsif new.status = 'cancelled' then
+    insert into public.notifications (user_id, title, body, link) values
+      (new.user_id, '주문이 취소되었습니다',
+       case when old.status = 'pending_payment'
+            then '주문 ' || new.order_number || '이(가) 취소되었습니다. 미입금 주문은 기한이 지나면 자동 취소됩니다.'
+            else '주문 ' || new.order_number || '이(가) 취소되었습니다.' end,
+       '/orders/' || new.id);
+    -- 결제 이후 취소는 셀러에게도 알림
+    if old.status <> 'pending_payment' then
+      for v_seller in
+        select distinct seller_id from public.order_items where order_id = new.id
+      loop
+        insert into public.notifications (user_id, title, body, link) values
+          (v_seller.seller_id, '주문이 취소되었습니다',
+           '주문 ' || new.order_number || '이(가) 취소되었습니다. 판매 내역을 확인해 주세요.',
+           '/seller');
+      end loop;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_order_events on public.orders;
+create trigger trg_notify_order_events
+  after update of status on public.orders
+  for each row execute function public.notify_order_events();

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
+import '../notifications/notifications_providers.dart';
 import '../seller/seller_providers.dart';
 import 'categories.dart';
 import 'product.dart';
@@ -75,6 +76,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
       appBar: AppBar(
         title: const Text('공동구매'),
         actions: [
+          if (user != null) const _NotificationBell(),
           Badge(
             isLabelVisible: cartCount > 0,
             label: Text('$cartCount'),
@@ -211,6 +213,26 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 알림 종 아이콘 + 안읽음 배지 (Realtime 스트림으로 실시간 갱신)
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadNotificationCountProvider);
+    return Badge(
+      isLabelVisible: unread > 0,
+      label: Text('$unread'),
+      offset: const Offset(-6, 6),
+      child: IconButton(
+        tooltip: '알림',
+        icon: const Icon(Icons.notifications_outlined),
+        onPressed: () => context.push('/notifications'),
       ),
     );
   }
