@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../maintenance/maintenance.dart';
+import '../maintenance/maintenance_providers.dart';
 import '../orders/orders_providers.dart';
 import '../products/products_providers.dart';
 import '../seller/seller_profile.dart';
@@ -20,6 +22,16 @@ class AdminHomePage extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('관리자'),
+          actions: [
+            IconButton(
+              tooltip: '점검 시간 설정',
+              icon: const Icon(Icons.bedtime_outlined),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => const _MaintenanceSettingsDialog(),
+              ),
+            ),
+          ],
           bottom: const TabBar(isScrollable: true, tabs: [
             Tab(text: '셀러 관리'),
             Tab(text: '상품 관리'),
@@ -597,6 +609,160 @@ class _AdminSettlementTab extends ConsumerWidget {
               ),
         ],
       ),
+    );
+  }
+}
+
+/// 점검 시간(break time) 설정 다이얼로그.
+/// NAS 전원 스케줄과 같은 시간대로 맞춰두면 서버가 꺼진 동안
+/// 앱이 안내 화면을 띄운다 (앱은 마지막 설정을 캐시해 판단).
+class _MaintenanceSettingsDialog extends ConsumerStatefulWidget {
+  const _MaintenanceSettingsDialog();
+
+  @override
+  ConsumerState<_MaintenanceSettingsDialog> createState() =>
+      _MaintenanceSettingsDialogState();
+}
+
+class _MaintenanceSettingsDialogState
+    extends ConsumerState<_MaintenanceSettingsDialog> {
+  bool _enabled = true;
+  TimeOfDay _start = const TimeOfDay(hour: 2, minute: 0);
+  TimeOfDay _end = const TimeOfDay(hour: 8, minute: 0);
+  late final TextEditingController _message;
+  bool _loaded = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _message = TextEditingController();
+    ref.read(maintenanceConfigProvider.future).then((config) {
+      if (!mounted) return;
+      setState(() {
+        _enabled = config.enabled;
+        _start = _parse(config.start) ?? _start;
+        _end = _parse(config.end) ?? _end;
+        _message.text = config.message;
+        _loaded = true;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  TimeOfDay? _parse(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return TimeOfDay(hour: h, minute: m);
+  }
+
+  String _fmt(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _pick(bool isStart) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _start : _end,
+    );
+    if (picked == null) return;
+    setState(() => isStart ? _start = picked : _end = picked);
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(maintenanceRepositoryProvider).save(MaintenanceConfig(
+            enabled: _enabled,
+            start: _fmt(_start),
+            end: _fmt(_end),
+            message: _message.text.trim(),
+          ));
+      ref.invalidate(maintenanceConfigProvider);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('저장에 실패했습니다: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('점검 시간 설정'),
+      content: !_loaded
+          ? const SizedBox(
+              height: 80, child: Center(child: CircularProgressIndicator()))
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('점검 안내 사용'),
+                  value: _enabled,
+                  onChanged: (v) => setState(() => _enabled = v),
+                ),
+                Row(
+                  children: [
+                    const Text('시작'),
+                    const Spacer(),
+                    TextButton(
+                        onPressed: () => _pick(true),
+                        child: Text(_fmt(_start))),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Text('종료'),
+                    const Spacer(),
+                    TextButton(
+                        onPressed: () => _pick(false),
+                        child: Text(_fmt(_end))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _message,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '안내 문구',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'NAS 전원 스케줄과 같은 시간대로 맞춰 주세요.\n'
+                  '앱은 마지막 설정을 저장해 두고 서버가 꺼진 동안에도 안내를 띄웁니다.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context), child: const Text('취소')),
+        FilledButton(
+          onPressed: _saving || !_loaded ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18, height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('저장'),
+        ),
+      ],
     );
   }
 }

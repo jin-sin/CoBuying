@@ -1047,3 +1047,30 @@ drop trigger if exists trg_notify_order_events on public.orders;
 create trigger trg_notify_order_events
   after update of status on public.orders
   for each row execute function public.notify_order_events();
+
+-- ------------------------------------------------------------
+-- 20. 앱 설정 (점검 시간 안내 등)
+--     서버(NAS)가 전원 스케줄로 꺼지는 시간대에 앱이 "break time" 안내를
+--     띄우기 위한 키-값 설정. 클라이언트는 값을 캐시해 두고 서버가 꺼진
+--     동안에도 마지막 설정으로 판단한다.
+-- ------------------------------------------------------------
+create table if not exists public.app_settings (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_settings enable row level security;
+
+drop policy if exists "app_settings_select" on public.app_settings;
+create policy "app_settings_select" on public.app_settings
+  for select using (true);   -- 점검 안내는 로그인 전에도 보여야 함
+drop policy if exists "app_settings_admin_write" on public.app_settings;
+create policy "app_settings_admin_write" on public.app_settings
+  for all using (public.is_admin()) with check (public.is_admin());
+
+insert into public.app_settings (key, value) values
+  ('maintenance',
+   '{"enabled": true, "start": "02:00", "end": "08:00",
+     "message": "break time ~ 지금은 서버 점검 시간이에요.\n아침에 다시 만나요!"}'::jsonb)
+on conflict (key) do nothing;

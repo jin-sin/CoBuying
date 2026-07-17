@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/env.dart';
 import 'core/theme.dart';
+import 'features/maintenance/maintenance_gate.dart';
 import 'features/orders/payment_result_page.dart';
 import 'router/app_router.dart';
 
@@ -44,6 +45,9 @@ class CoBuyingApp extends ConsumerWidget {
       title: '공동구매',
       theme: buildAppTheme(),
       routerConfig: router,
+      // 점검 시간대(서버 전원 스케줄)에는 전체 화면 안내로 덮는다
+      builder: (context, child) =>
+          MaintenanceGate(child: child ?? const SizedBox.shrink()),
       locale: const Locale('ko', 'KR'),
       supportedLocales: const [Locale('ko', 'KR'), Locale('en', 'US')],
       localizationsDelegates: const [
