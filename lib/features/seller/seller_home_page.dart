@@ -201,7 +201,9 @@ class _MySalesTab extends ConsumerWidget {
                     child: Column(
                       children: [
                         ListTile(
-                          title: Text('${item.productTitle} × ${item.quantity}'),
+                          title: Text('${item.productTitle}'
+                              '${item.optionsLabel.isEmpty ? '' : ' (${item.optionsLabel})'}'
+                              ' × ${item.quantity}'),
                           subtitle: Text(
                               '${order.orderNumber} · ${formatDateTime(order.createdAt)}\n'
                               '${order.receiverName} · ${order.address1} ${order.address2}'),

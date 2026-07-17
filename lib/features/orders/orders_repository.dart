@@ -18,7 +18,9 @@ class OrdersRepository {
     required String address2,
     required String memo,
     String? depositorName,
-    required List<({String productId, int quantity})> items,
+    required List<
+            ({String productId, int quantity, Map<String, String> options})>
+        items,
   }) async {
     final orderId = await _client.rpc('create_order', params: {
       'p_payment_method': paymentMethod,
@@ -31,7 +33,11 @@ class OrdersRepository {
       'p_depositor_name': depositorName,
       'p_items': [
         for (final i in items)
-          {'product_id': i.productId, 'quantity': i.quantity},
+          {
+            'product_id': i.productId,
+            'quantity': i.quantity,
+            'options': i.options,
+          },
       ],
     });
     return orderId as String;

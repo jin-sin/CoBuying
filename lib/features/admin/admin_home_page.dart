@@ -300,6 +300,9 @@ class _AdminOrdersTab extends ConsumerWidget {
                     ListTile(
                       dense: true,
                       title: Text(item.productTitle),
+                      subtitle: item.optionsLabel.isEmpty
+                          ? null
+                          : Text(item.optionsLabel),
                       trailing: Text(
                           '${item.quantity}개 · ${formatWon(item.lineTotal)}'
                           '${o.status == 'pending_payment' || o.status == 'cancelled' ? '' : ' · ${item.statusLabel}'}'),

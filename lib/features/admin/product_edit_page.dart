@@ -29,6 +29,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   DateTime _startsAt = DateTime.now();
   DateTime _endsAt = DateTime.now().add(const Duration(days: 1));
   List<String> _imageUrls = [];
+  final List<_OptionGroupEdit> _optionGroups = [];
   bool _loading = false;
   bool _saving = false;
   bool _uploadingImage = false;
@@ -57,6 +58,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         _startsAt = product.startsAt.toLocal();
         _endsAt = product.endsAt.toLocal();
         _imageUrls = [...product.imageUrls];
+        _optionGroups
+          ..clear()
+          ..addAll(product.options.map(_OptionGroupEdit.from));
       });
     }
     if (mounted) setState(() => _loading = false);
@@ -67,7 +71,39 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     for (final c in [_title, _description, _price, _originalPrice, _stock]) {
       c.dispose();
     }
+    for (final g in _optionGroups) {
+      g.name.dispose();
+    }
     super.dispose();
+  }
+
+  /// 옵션 그룹 편집 상태 → 저장용 모델. 이름/선택지가 비면 예외 메시지.
+  List<ProductOption> _buildOptions() {
+    final result = <ProductOption>[];
+    for (final g in _optionGroups) {
+      final name = g.name.text.trim();
+      if (name.isEmpty) {
+        throw '옵션 그룹 이름을 입력하세요.';
+      }
+      if (g.choices.isEmpty) {
+        throw '옵션 "$name"에 선택지를 하나 이상 추가하세요.';
+      }
+      result.add(ProductOption(name: name, choices: [...g.choices]));
+    }
+    return result;
+  }
+
+  Future<void> _addChoice(_OptionGroupEdit group) async {
+    final choice = await showDialog<OptionChoice>(
+      context: context,
+      builder: (context) => const _ChoiceDialog(),
+    );
+    if (choice == null) return;
+    setState(() {
+      // 같은 이름 선택지는 교체 (추가금 수정 용도)
+      group.choices.removeWhere((c) => c.name == choice.name);
+      group.choices.add(choice);
+    });
   }
 
   Future<void> _pickAndUploadImage() async {
@@ -125,8 +161,18 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       return;
     }
 
+    final List<ProductOption> options;
+    try {
+      options = _buildOptions();
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+
     final product = Product(
       id: widget.productId ?? '',
+      options: options,
       title: _title.text.trim(),
       description: _description.text.trim(),
       price: int.parse(_price.text.trim()),
@@ -245,6 +291,77 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         validator: _requiredNumber,
                       ),
                       const SizedBox(height: 24),
+                      Text('옵션 (선택)',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(
+                        '사이즈·색상·분쇄도처럼 구매자가 골라야 하는 항목. 선택지에 추가금(+원)도 넣을 수 있어요.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final group in _optionGroups)
+                        Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: group.name,
+                                        decoration: const InputDecoration(
+                                          labelText: '옵션 이름 (예: 사이즈)',
+                                          border: InputBorder.none,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline),
+                                      tooltip: '옵션 삭제',
+                                      onPressed: () => setState(() {
+                                        group.name.dispose();
+                                        _optionGroups.remove(group);
+                                      }),
+                                    ),
+                                  ],
+                                ),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    for (final c in group.choices)
+                                      InputChip(
+                                        label: Text(c.extra > 0
+                                            ? '${c.name} (+${formatWon(c.extra)})'
+                                            : c.name),
+                                        onDeleted: () => setState(
+                                            () => group.choices.remove(c)),
+                                      ),
+                                    ActionChip(
+                                      avatar: const Icon(Icons.add, size: 18),
+                                      label: const Text('선택지'),
+                                      onPressed: () => _addChoice(group),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.add),
+                        label: const Text('옵션 그룹 추가'),
+                        onPressed: () => setState(
+                            () => _optionGroups.add(_OptionGroupEdit())),
+                      ),
+                      const SizedBox(height: 24),
                       Text('판매 기간',
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
@@ -352,6 +469,79 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// 옵션 그룹 편집 상태 (이름 컨트롤러 + 선택지 목록)
+class _OptionGroupEdit {
+  _OptionGroupEdit() : name = TextEditingController();
+
+  _OptionGroupEdit.from(ProductOption option)
+      : name = TextEditingController(text: option.name),
+        choices = [...option.choices];
+
+  final TextEditingController name;
+  List<OptionChoice> choices = [];
+}
+
+/// 선택지 추가 다이얼로그 (이름 + 추가금)
+class _ChoiceDialog extends StatefulWidget {
+  const _ChoiceDialog();
+
+  @override
+  State<_ChoiceDialog> createState() => _ChoiceDialogState();
+}
+
+class _ChoiceDialogState extends State<_ChoiceDialog> {
+  final _name = TextEditingController();
+  final _extra = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _extra.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    Navigator.pop(
+      context,
+      OptionChoice(name: name, extra: int.tryParse(_extra.text.trim()) ?? 0),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('선택지 추가'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: '선택지 이름 (예: L)'),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _extra,
+            decoration: const InputDecoration(
+                labelText: '추가금 (원, 없으면 비워두세요)'),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context), child: const Text('취소')),
+        FilledButton(onPressed: _submit, child: const Text('추가')),
+      ],
     );
   }
 }

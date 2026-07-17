@@ -63,7 +63,11 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     final orderable =
         (ref.read(cartProvider).value ?? []).where((i) => i.isOrderable).toList();
     final items = orderable
-        .map((i) => (productId: i.productId, quantity: i.quantity))
+        .map((i) => (
+              productId: i.productId,
+              quantity: i.quantity,
+              options: i.selectedOptions,
+            ))
         .toList();
     if (items.isEmpty) return;
 
@@ -150,6 +154,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                               ListTile(
                                 dense: true,
                                 title: Text(item.product?.title ?? ''),
+                                subtitle: item.optionsLabel.isEmpty
+                                    ? null
+                                    : Text(item.optionsLabel),
                                 trailing: Text(
                                     '${item.quantity}개 · ${formatWon(item.lineTotal)}'),
                               ),

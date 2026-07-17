@@ -137,6 +137,10 @@ class _CartTile extends ConsumerWidget {
                 children: [
                   Text(product?.title ?? '(삭제된 상품)',
                       maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (item.optionsLabel.isNotEmpty)
+                    Text(item.optionsLabel,
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey[600])),
                   const SizedBox(height: 4),
                   Text(formatWon(item.lineTotal),
                       style: const TextStyle(fontWeight: FontWeight.bold)),

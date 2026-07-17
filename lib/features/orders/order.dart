@@ -75,6 +75,7 @@ class OrderItem {
     this.commissionRate = 0,
     this.feeAmount = 0,
     this.status = 'preparing',
+    this.selectedOptions = const {},
   });
 
   final String? id;
@@ -86,8 +87,13 @@ class OrderItem {
   final double commissionRate; // 주문 시점 수수료율 (%)
   final int feeAmount; // 플랫폼 수수료 (원)
   final String status; // 아이템별 배송 상태 (셀러가 관리)
+  final Map<String, String> selectedOptions; // 주문 시점 옵션 스냅샷
 
   int get lineTotal => unitPrice * quantity;
+
+  /// "사이즈: L · 색상: 검정" 형태 표시용 (옵션 없으면 빈 문자열)
+  String get optionsLabel =>
+      selectedOptions.entries.map((e) => '${e.key}: ${e.value}').join(' · ');
 
   /// 셀러 입장에서의 정산 금액
   int get sellerPayout => lineTotal - feeAmount;
@@ -109,5 +115,8 @@ class OrderItem {
         commissionRate: (json['commission_rate'] as num? ?? 0).toDouble(),
         feeAmount: (json['fee_amount'] as num? ?? 0).toInt(),
         status: json['status'] as String? ?? 'preparing',
+        selectedOptions: (json['selected_options'] as Map<String, dynamic>? ??
+                const {})
+            .map((k, v) => MapEntry(k, v.toString())),
       );
 }

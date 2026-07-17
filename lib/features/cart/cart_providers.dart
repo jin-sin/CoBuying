@@ -15,8 +15,14 @@ class CartNotifier extends AsyncNotifier<List<CartItem>> {
     return ref.watch(cartRepositoryProvider).fetchCart();
   }
 
-  Future<void> add(String productId, int quantity) async {
-    await ref.read(cartRepositoryProvider).addToCart(productId, quantity);
+  Future<void> add(
+    String productId,
+    int quantity, {
+    Map<String, String> selectedOptions = const {},
+  }) async {
+    await ref
+        .read(cartRepositoryProvider)
+        .addToCart(productId, quantity, selectedOptions: selectedOptions);
     ref.invalidateSelf();
   }
 

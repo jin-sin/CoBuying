@@ -771,3 +771,151 @@ select cron.schedule(
        and payment_method = 'card'
        and created_at < now() - interval '1 hour' $$
 );
+
+-- ------------------------------------------------------------
+-- 16. 상품 옵션 (사이즈·색상·분쇄도 등)
+--     옵션 정의는 products.options (jsonb):
+--       [{"name":"사이즈","choices":[{"name":"S","extra":0},{"name":"L","extra":1000}]}]
+--     재고는 상품 전체 단위 그대로. 구매자는 그룹마다 하나를 선택하고
+--     선택 결과는 {"사이즈":"L"} 형태로 장바구니/주문 아이템에 저장된다.
+--     추가금(extra)은 create_order가 서버에서 재계산한다.
+-- ------------------------------------------------------------
+alter table public.products
+  add column if not exists options jsonb not null default '[]'::jsonb;
+
+-- select * 뷰라 컬럼 추가 반영을 위해 재생성
+create or replace view public.active_products
+with (security_invoker = true) as
+  select * from public.products
+  where status = 'active'
+    and starts_at <= now()
+    and ends_at > now();
+
+-- 같은 상품이라도 옵션 조합이 다르면 별도 장바구니 줄
+alter table public.cart_items
+  add column if not exists selected_options jsonb not null default '{}'::jsonb;
+alter table public.cart_items
+  drop constraint if exists cart_items_user_id_product_id_key;
+create unique index if not exists idx_cart_items_unique
+  on public.cart_items (user_id, product_id, selected_options);
+
+-- 주문 아이템에 선택 옵션 스냅샷 (unit_price에는 추가금이 합산돼 있음)
+alter table public.order_items
+  add column if not exists selected_options jsonb not null default '{}'::jsonb;
+
+-- create_order 갱신: 옵션 검증 + 추가금 합산 단가 + 선택 스냅샷 저장
+create or replace function public.create_order(
+  p_payment_method text,
+  p_receiver_name  text,
+  p_receiver_phone text,
+  p_postcode       text,
+  p_address1       text,
+  p_address2       text,
+  p_memo           text,
+  p_depositor_name text,
+  p_items          jsonb
+)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_user_id  uuid := auth.uid();
+  v_order_id uuid;
+  v_total    integer := 0;
+  v_item     jsonb;
+  v_product  public.products%rowtype;
+  v_qty      integer;
+  v_rate     numeric(5,2);
+  v_fee      integer;
+  v_sel      jsonb;
+  v_group    jsonb;
+  v_choice   jsonb;
+  v_unit     integer;
+  v_snap     jsonb;
+begin
+  if v_user_id is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception '주문 상품이 없습니다.';
+  end if;
+
+  insert into public.orders
+    (order_number, user_id, payment_method, total_amount, depositor_name,
+     receiver_name, receiver_phone, postcode, address1, address2, memo)
+  values
+    ('CB' || to_char(now(), 'YYMMDD') || '-' || upper(substr(gen_random_uuid()::text, 1, 6)),
+     v_user_id, p_payment_method, 0, p_depositor_name,
+     p_receiver_name, p_receiver_phone, p_postcode, p_address1, p_address2, coalesce(p_memo, ''))
+  returning id into v_order_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_qty := (v_item ->> 'quantity')::integer;
+
+    -- 행 잠금으로 동시 주문 시 재고 초과 방지
+    select * into v_product
+    from public.products
+    where id = (v_item ->> 'product_id')::uuid
+    for update;
+
+    if not found then
+      raise exception '존재하지 않는 상품입니다.';
+    end if;
+    if v_product.status <> 'active' or v_product.ends_at <= now() then
+      raise exception '판매가 마감된 상품입니다: %', v_product.title;
+    end if;
+    if v_product.stock < v_qty then
+      raise exception '재고가 부족합니다: % (남은 수량 %)', v_product.title, v_product.stock;
+    end if;
+
+    -- 옵션 검증: 상품에 정의된 그룹마다 유효한 선택이 있어야 하고,
+    -- 추가금은 클라이언트를 믿지 않고 여기서 합산한다.
+    v_sel  := coalesce(v_item -> 'options', '{}'::jsonb);
+    v_unit := v_product.price;
+    v_snap := '{}'::jsonb;
+    for v_group in select * from jsonb_array_elements(coalesce(v_product.options, '[]'::jsonb))
+    loop
+      v_choice := null;
+      select c into v_choice
+      from jsonb_array_elements(v_group -> 'choices') c
+      where c ->> 'name' = v_sel ->> (v_group ->> 'name')
+      limit 1;
+      if v_choice is null then
+        raise exception '옵션을 선택해 주세요: % (%)', v_group ->> 'name', v_product.title;
+      end if;
+      v_unit := v_unit + coalesce((v_choice ->> 'extra')::integer, 0);
+      v_snap := v_snap || jsonb_build_object(v_group ->> 'name', v_choice ->> 'name');
+    end loop;
+
+    update public.products set stock = stock - v_qty, updated_at = now()
+    where id = v_product.id;
+
+    -- 주문 시점 수수료율 스냅샷 (관리자 직접 등록 상품은 수수료 0)
+    v_rate := coalesce(
+      (select commission_rate from public.seller_profiles
+       where user_id = v_product.seller_id and status = 'approved'),
+      0
+    );
+    v_fee := round(v_unit * v_qty * v_rate / 100.0);
+
+    insert into public.order_items
+      (order_id, product_id, seller_id, product_title, unit_price, quantity,
+       commission_rate, fee_amount, selected_options)
+    values
+      (v_order_id, v_product.id, v_product.seller_id, v_product.title,
+       v_unit, v_qty, v_rate, v_fee, v_snap);
+
+    v_total := v_total + v_unit * v_qty;
+  end loop;
+
+  update public.orders set total_amount = v_total where id = v_order_id;
+
+  delete from public.cart_items
+  where user_id = v_user_id
+    and product_id in (select (i ->> 'product_id')::uuid from jsonb_array_elements(p_items) i);
+
+  return v_order_id;
+end;
+$$;

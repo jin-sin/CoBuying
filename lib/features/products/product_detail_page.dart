@@ -22,13 +22,26 @@ class ProductDetailPage extends ConsumerStatefulWidget {
 class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
   int _quantity = 1;
 
+  /// 선택한 옵션 {그룹명: 선택지명}
+  final Map<String, String> _selected = {};
+
   Future<void> _addToCart(Product product) async {
     if (ref.read(currentUserProvider) == null) {
       context.push('/login');
       return;
     }
+    final missing = product.options
+        .where((g) => !_selected.containsKey(g.name))
+        .map((g) => g.name)
+        .toList();
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('옵션을 선택해 주세요: ${missing.join(', ')}')));
+      return;
+    }
     try {
-      await ref.read(cartProvider.notifier).add(product.id, _quantity);
+      await ref.read(cartProvider.notifier).add(product.id, _quantity,
+          selectedOptions: Map.of(_selected));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -144,6 +157,38 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                                     ? Colors.grey[700]
                                     : Colors.red),
                           ),
+                          if (product.options.isNotEmpty) ...[
+                            const Divider(height: 32),
+                            Text('옵션 선택', style: theme.textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            for (final group in product.options)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: _selected[group.name],
+                                  decoration: InputDecoration(
+                                    labelText: '${group.name} *',
+                                    border: const OutlineInputBorder(),
+                                  ),
+                                  items: [
+                                    for (final c in group.choices)
+                                      DropdownMenuItem(
+                                        value: c.name,
+                                        child: Text(c.extra > 0
+                                            ? '${c.name} (+${formatWon(c.extra)})'
+                                            : c.name),
+                                      ),
+                                  ],
+                                  onChanged: onSale
+                                      ? (v) => setState(() {
+                                            if (v != null) {
+                                              _selected[group.name] = v;
+                                            }
+                                          })
+                                      : null,
+                                ),
+                              ),
+                          ],
                           const Divider(height: 32),
                           Text('상품 설명', style: theme.textTheme.titleMedium),
                           const SizedBox(height: 8),
@@ -161,6 +206,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
         _BottomBar(
           product: product,
           quantity: _quantity,
+          unitPrice: product.price + product.optionExtra(_selected),
           onSale: onSale,
           onQuantityChanged: (q) => setState(() => _quantity = q),
           onAddToCart: () => _addToCart(product),
@@ -174,6 +220,7 @@ class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.product,
     required this.quantity,
+    required this.unitPrice,
     required this.onSale,
     required this.onQuantityChanged,
     required this.onAddToCart,
@@ -181,6 +228,7 @@ class _BottomBar extends StatelessWidget {
 
   final Product product;
   final int quantity;
+  final int unitPrice; // 옵션 추가금 포함 단가
   final bool onSale;
   final ValueChanged<int> onQuantityChanged;
   final VoidCallback onAddToCart;
@@ -220,7 +268,7 @@ class _BottomBar extends StatelessWidget {
               child: FilledButton(
                 onPressed: onSale ? onAddToCart : null,
                 child: Text(onSale
-                    ? '${formatWon(product.price * quantity)} 담기'
+                    ? '${formatWon(unitPrice * quantity)} 담기'
                     : product.isExpired
                         ? '판매가 마감되었습니다'
                         : '품절'),
