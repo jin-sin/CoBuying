@@ -7,15 +7,66 @@ import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
 import '../seller/seller_providers.dart';
+import 'categories.dart';
 import 'product.dart';
 import 'products_providers.dart';
 import 'widgets/countdown_badge.dart';
 
-class ProductListPage extends ConsumerWidget {
+/// 목록 정렬 기준
+enum _Sort {
+  endingSoon('마감임박순'),
+  newest('신상품순'),
+  priceLow('낮은가격순'),
+  priceHigh('높은가격순');
+
+  const _Sort(this.label);
+  final String label;
+}
+
+class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProductListPage> createState() => _ProductListPageState();
+}
+
+class _ProductListPageState extends ConsumerState<ProductListPage> {
+  final _search = TextEditingController();
+  String _query = '';
+  String? _category; // null = 전체
+  _Sort _sort = _Sort.endingSoon;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<Product> _apply(List<Product> items) {
+    final q = _query.trim().toLowerCase();
+    final list = items.where((p) {
+      if (_category != null && p.category != _category) return false;
+      if (q.isEmpty) return true;
+      return p.title.toLowerCase().contains(q) ||
+          p.description.toLowerCase().contains(q) ||
+          p.shopName.toLowerCase().contains(q);
+    }).toList();
+    switch (_sort) {
+      case _Sort.endingSoon:
+        list.sort((a, b) => a.endsAt.compareTo(b.endsAt));
+      case _Sort.newest:
+        list.sort((a, b) => (b.createdAt ?? b.startsAt)
+            .compareTo(a.createdAt ?? a.startsAt));
+      case _Sort.priceLow:
+        list.sort((a, b) => a.price.compareTo(b.price));
+      case _Sort.priceHigh:
+        list.sort((a, b) => b.price.compareTo(a.price));
+    }
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final products = ref.watch(activeProductsProvider);
     final user = ref.watch(currentUserProvider);
     final cartCount = ref.watch(cartItemCountProvider);
@@ -44,32 +95,161 @@ class ProductListPage extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () => ref.refresh(activeProductsProvider.future),
-        child: products.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => _ErrorView(
-            message: '상품을 불러오지 못했습니다.\n$e',
-            onRetry: () => ref.invalidate(activeProductsProvider),
-          ),
-          data: (items) => items.isEmpty
-              ? const _EmptyView()
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final columns = (constraints.maxWidth / 320).floor().clamp(1, 4);
-                    return GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 0.72,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, i) => _ProductCard(product: items[i]),
-                    );
-                  },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    decoration: InputDecoration(
+                      hintText: '상품·판매자 검색',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _search.clear();
+                                setState(() => _query = '');
+                              },
+                            ),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                DropdownButton<_Sort>(
+                  value: _sort,
+                  underline: const SizedBox.shrink(),
+                  items: [
+                    for (final s in _Sort.values)
+                      DropdownMenuItem(value: s, child: Text(s.label)),
+                  ],
+                  onChanged: (s) =>
+                      setState(() => _sort = s ?? _Sort.endingSoon),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              // Material Chip은 가로 무제한 레이아웃에서 최소 intrinsic 폭
+              // (한글은 글자 단위 줄바꿈 가능 → 1글자)으로 접혀 라벨이 잘리므로
+              // 커스텀 알약 버튼을 쓴다.
+              child: Row(
+                children: [
+                  _CategoryPill(
+                    label: '전체',
+                    selected: _category == null,
+                    onTap: () => setState(() => _category = null),
+                  ),
+                  for (final c in productCategories) ...[
+                    const SizedBox(width: 8),
+                    _CategoryPill(
+                      label: c,
+                      selected: _category == c,
+                      onTap: () => setState(
+                          () => _category = _category == c ? null : c),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.refresh(activeProductsProvider.future),
+              child: products.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _ErrorView(
+                  message: '상품을 불러오지 못했습니다.\n$e',
+                  onRetry: () => ref.invalidate(activeProductsProvider),
+                ),
+                data: (items) {
+                  if (items.isEmpty) return const _EmptyView();
+                  final filtered = _apply(items);
+                  if (filtered.isEmpty) {
+                    return ListView(children: const [
+                      SizedBox(height: 120),
+                      Icon(Icons.search_off, size: 48, color: Colors.grey),
+                      SizedBox(height: 12),
+                      Center(child: Text('조건에 맞는 상품이 없습니다.')),
+                    ]);
+                  }
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns =
+                          (constraints.maxWidth / 320).floor().clamp(1, 4);
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 0.72,
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, i) =>
+                            _ProductCard(product: filtered[i]),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 카테고리 선택 알약 버튼 (가로 스크롤용 Chip 대체)
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? scheme.primaryContainer : Colors.transparent,
+      shape: StadiumBorder(
+        side: BorderSide(
+            color: selected ? Colors.transparent : scheme.outlineVariant),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Text(
+            label,
+            softWrap: false,
+            style: TextStyle(
+              color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
+              fontWeight: selected ? FontWeight.bold : null,
+            ),
+          ),
         ),
       ),
     );

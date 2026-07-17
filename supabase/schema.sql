@@ -928,3 +928,20 @@ $$;
 alter table public.seller_profiles
   add column if not exists business_number text not null default '',       -- 사업자등록번호 (숫자 10자리)
   add column if not exists online_sales_number text not null default '';   -- 통신판매업 신고번호 (선택)
+
+-- ------------------------------------------------------------
+-- 18. 상품 카테고리
+--     카테고리 목록은 앱(lib/features/products/categories.dart)에서 관리.
+-- ------------------------------------------------------------
+alter table public.products
+  add column if not exists category text not null default '기타';
+
+create index if not exists idx_products_category on public.products (category);
+
+-- select * 뷰라 컬럼 추가 반영을 위해 재생성
+create or replace view public.active_products
+with (security_invoker = true) as
+  select * from public.products
+  where status = 'active'
+    and starts_at <= now()
+    and ends_at > now();

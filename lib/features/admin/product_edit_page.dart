@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/formatters.dart';
+import '../products/categories.dart';
 import '../products/product.dart';
 import '../products/products_providers.dart';
 
@@ -30,6 +31,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   DateTime _endsAt = DateTime.now().add(const Duration(days: 1));
   List<String> _imageUrls = [];
   final List<_OptionGroupEdit> _optionGroups = [];
+  String _category = '기타';
   bool _loading = false;
   bool _saving = false;
   bool _uploadingImage = false;
@@ -61,6 +63,10 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         _optionGroups
           ..clear()
           ..addAll(product.options.map(_OptionGroupEdit.from));
+        // 목록에서 빠진 옛 카테고리 값이어도 드롭다운이 깨지지 않게 보정
+        _category = productCategories.contains(product.category)
+            ? product.category
+            : '기타';
       });
     }
     if (mounted) setState(() => _loading = false);
@@ -173,6 +179,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     final product = Product(
       id: widget.productId ?? '',
       options: options,
+      category: _category,
       title: _title.text.trim(),
       description: _description.text.trim(),
       price: int.parse(_price.text.trim()),
@@ -244,6 +251,18 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         validator: (v) => (v == null || v.trim().isEmpty)
                             ? '상품명을 입력하세요'
                             : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _category,
+                        decoration:
+                            const InputDecoration(labelText: '카테고리 *'),
+                        items: [
+                          for (final c in productCategories)
+                            DropdownMenuItem(value: c, child: Text(c)),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _category = v ?? '기타'),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(

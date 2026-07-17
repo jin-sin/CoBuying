@@ -46,6 +46,8 @@ class Product {
     required this.endsAt,
     required this.status,
     this.options = const [],
+    this.category = '기타',
+    this.createdAt,
   });
 
   final String id;
@@ -61,6 +63,8 @@ class Product {
   final DateTime endsAt;
   final String status; // active | closed | hidden
   final List<ProductOption> options;
+  final String category;
+  final DateTime? createdAt; // 신상품순 정렬용
 
   /// 선택된 옵션({그룹명: 선택지명})의 추가금 합계.
   /// 선택지가 옵션 정의에서 사라졌으면 0으로 취급한다.
@@ -103,6 +107,10 @@ class Product {
         options: (json['options'] as List<dynamic>? ?? [])
             .map((e) => ProductOption.fromJson(e as Map<String, dynamic>))
             .toList(),
+        category: json['category'] as String? ?? '기타',
+        createdAt: json['created_at'] == null
+            ? null
+            : DateTime.parse(json['created_at'] as String),
       );
 
   Map<String, dynamic> toInsertJson() => {
@@ -116,5 +124,6 @@ class Product {
         'ends_at': endsAt.toUtc().toIso8601String(),
         'status': status,
         'options': [for (final o in options) o.toJson()],
+        'category': category,
       };
 }
