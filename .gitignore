@@ -46,3 +46,6 @@ app.*.map.json
 
 # Claude Code 로컬 설정 (launch.json 등)
 /.claude/
+
+# wrangler 로컬 상태
+tools/cloudflare/.wrangler/
