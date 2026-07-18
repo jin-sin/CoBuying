@@ -48,6 +48,9 @@ class Product {
     this.options = const [],
     this.category = '기타',
     this.createdAt,
+    this.salePrice,
+    this.saleStartsAt,
+    this.saleEndsAt,
   });
 
   final String id;
@@ -65,6 +68,26 @@ class Product {
   final List<ProductOption> options;
   final String category;
   final DateTime? createdAt; // 신상품순 정렬용
+  final int? salePrice; // 타임세일가 (셀러 예약 할인)
+  final DateTime? saleStartsAt;
+  final DateTime? saleEndsAt;
+
+  /// 지금 타임세일 적용 중인지 (서버 create_order의 effective_price와 동일 판정)
+  bool get isOnTimeSale {
+    final sale = salePrice;
+    final start = saleStartsAt;
+    final end = saleEndsAt;
+    if (sale == null || start == null || end == null) return false;
+    final now = DateTime.now();
+    return sale < price && now.isAfter(start) && now.isBefore(end);
+  }
+
+  /// 현재 적용 단가 (타임세일 중이면 세일가)
+  int get effectivePrice => isOnTimeSale ? salePrice! : price;
+
+  /// 타임세일 할인율 (평소가 대비)
+  int? get saleDiscountRate =>
+      isOnTimeSale ? ((price - salePrice!) / price * 100).round() : null;
 
   /// 선택된 옵션({그룹명: 선택지명})의 추가금 합계.
   /// 선택지가 옵션 정의에서 사라졌으면 0으로 취급한다.
@@ -111,6 +134,13 @@ class Product {
         createdAt: json['created_at'] == null
             ? null
             : DateTime.parse(json['created_at'] as String),
+        salePrice: json['sale_price'] as int?,
+        saleStartsAt: json['sale_starts_at'] == null
+            ? null
+            : DateTime.parse(json['sale_starts_at'] as String),
+        saleEndsAt: json['sale_ends_at'] == null
+            ? null
+            : DateTime.parse(json['sale_ends_at'] as String),
       );
 
   Map<String, dynamic> toInsertJson() => {
@@ -125,5 +155,8 @@ class Product {
         'status': status,
         'options': [for (final o in options) o.toJson()],
         'category': category,
+        'sale_price': salePrice,
+        'sale_starts_at': saleStartsAt?.toUtc().toIso8601String(),
+        'sale_ends_at': saleEndsAt?.toUtc().toIso8601String(),
       };
 }

@@ -24,6 +24,12 @@ flutter build web --release \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$ANON_KEY"
 
+# 캐시 버스팅: Cloudflare 프록시가 js에 max-age를 붙여 브라우저가 최대 4시간
+# 이전 번들을 쓰는 문제 방지. 배포마다 URL을 바꿔 즉시 새 번들을 받게 한다.
+STAMP=$(date +%s)
+sed -i '' "s|flutter_bootstrap\.js|flutter_bootstrap.js?v=$STAMP|g" build/web/index.html
+sed -i '' "s|\"main\.dart\.js\"|\"main.dart.js?v=$STAMP\"|g" build/web/flutter_bootstrap.js
+
 echo "▶ NAS 업로드..."
 tar -C build/web -czf - . | \
   ssh -p "$NAS_PORT" "$NAS" "rm -rf $WEB_DIR/* && tar -xzf - -C $WEB_DIR" 2>&1 | \

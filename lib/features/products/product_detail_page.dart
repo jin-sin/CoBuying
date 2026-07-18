@@ -125,7 +125,38 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                           Text(product.title,
                               style: theme.textTheme.headlineSmall),
                           const SizedBox(height: 8),
-                          if (product.originalPrice != null)
+                          if (product.isOnTimeSale) ...[
+                            // 타임세일: 평소가 취소선 + 세일 할인율 + 세일가
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.bolt,
+                                      size: 16, color: Colors.red),
+                                  Text(
+                                    '타임세일 ~ ${formatDateTime(product.saleEndsAt!)}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              formatWon(product.price),
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                decoration: TextDecoration.lineThrough,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ] else if (product.originalPrice != null)
                             Text(
                               formatWon(product.originalPrice!),
                               style: theme.textTheme.bodyLarge?.copyWith(
@@ -135,7 +166,14 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                             ),
                           Row(
                             children: [
-                              if (product.discountRate != null) ...[
+                              if (product.isOnTimeSale) ...[
+                                Text('${product.saleDiscountRate}%',
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 8),
+                              ] else if (product.discountRate != null) ...[
                                 Text('${product.discountRate}%',
                                     style: theme.textTheme.headlineSmall
                                         ?.copyWith(
@@ -143,7 +181,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                                             fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 8),
                               ],
-                              Text(formatWon(product.price),
+                              Text(formatWon(product.effectivePrice),
                                   style: theme.textTheme.headlineSmall
                                       ?.copyWith(fontWeight: FontWeight.bold)),
                             ],
@@ -209,7 +247,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
         _BottomBar(
           product: product,
           quantity: _quantity,
-          unitPrice: product.price + product.optionExtra(_selected),
+          unitPrice: product.effectivePrice + product.optionExtra(_selected),
           onSale: onSale,
           onQuantityChanged: (q) => setState(() => _quantity = q),
           onAddToCart: () => _addToCart(product),

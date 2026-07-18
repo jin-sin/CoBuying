@@ -19,9 +19,10 @@ class CartItem {
   /// 조인으로 함께 조회한 상품 정보 (삭제된 상품이면 null)
   final Product? product;
 
-  /// 옵션 추가금이 합산된 단가
+  /// 옵션 추가금이 합산된 단가 (타임세일 중이면 세일가 기준)
   int get unitPrice =>
-      (product?.price ?? 0) + (product?.optionExtra(selectedOptions) ?? 0);
+      (product?.effectivePrice ?? 0) +
+      (product?.optionExtra(selectedOptions) ?? 0);
 
   int get lineTotal => unitPrice * quantity;
 

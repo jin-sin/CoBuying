@@ -26,9 +26,12 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final _price = TextEditingController();
   final _originalPrice = TextEditingController();
   final _stock = TextEditingController();
+  final _salePrice = TextEditingController();
 
   DateTime _startsAt = DateTime.now();
   DateTime _endsAt = DateTime.now().add(const Duration(days: 1));
+  DateTime? _saleStartsAt;
+  DateTime? _saleEndsAt;
   List<String> _imageUrls = [];
   final List<_OptionGroupEdit> _optionGroups = [];
   String _category = '기타';
@@ -56,9 +59,13 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _originalPrice.text =
           product.originalPrice == null ? '' : '${product.originalPrice}';
       _stock.text = '${product.stock}';
+      _salePrice.text =
+          product.salePrice == null ? '' : '${product.salePrice}';
       setState(() {
         _startsAt = product.startsAt.toLocal();
         _endsAt = product.endsAt.toLocal();
+        _saleStartsAt = product.saleStartsAt?.toLocal();
+        _saleEndsAt = product.saleEndsAt?.toLocal();
         _imageUrls = [...product.imageUrls];
         _optionGroups
           ..clear()
@@ -74,7 +81,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
 
   @override
   void dispose() {
-    for (final c in [_title, _description, _price, _originalPrice, _stock]) {
+    for (final c in [
+      _title, _description, _price, _originalPrice, _stock, _salePrice,
+    ]) {
       c.dispose();
     }
     for (final g in _optionGroups) {
@@ -134,27 +143,45 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     }
   }
 
-  Future<void> _pickDateTime({required bool isEnd}) async {
-    final initial = isEnd ? _endsAt : _startsAt;
+  Future<DateTime?> _pickDateTimeValue(DateTime initial) async {
     final date = await showDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (date == null || !mounted) return;
+    if (date == null || !mounted) return null;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
     );
-    if (time == null) return;
-    final picked =
-        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _pickDateTime({required bool isEnd}) async {
+    final picked = await _pickDateTimeValue(isEnd ? _endsAt : _startsAt);
+    if (picked == null) return;
     setState(() {
       if (isEnd) {
         _endsAt = picked;
       } else {
         _startsAt = picked;
+      }
+    });
+  }
+
+  Future<void> _pickSaleDateTime({required bool isEnd}) async {
+    final picked = await _pickDateTimeValue(
+        (isEnd ? _saleEndsAt : _saleStartsAt) ?? DateTime.now());
+    if (picked == null) return;
+    setState(() {
+      if (isEnd) {
+        _saleEndsAt = picked;
+      } else {
+        _saleStartsAt = picked;
+        // 종료가 비어 있으면 흔한 케이스(당일 몇 시간)로 미리 채움
+        _saleEndsAt ??= picked.add(const Duration(hours: 2));
       }
     });
   }
@@ -165,6 +192,27 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('판매 마감이 시작보다 빠를 수 없습니다.')));
       return;
+    }
+
+    // 타임세일 검증: 세일가를 넣었으면 시간 구간이 온전해야 하고 평소가보다 싸야 한다
+    final saleText = _salePrice.text.trim();
+    final salePrice = saleText.isEmpty ? null : int.parse(saleText);
+    if (salePrice != null) {
+      if (_saleStartsAt == null || _saleEndsAt == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('타임세일 시작·종료 시간을 선택해 주세요.')));
+        return;
+      }
+      if (!_saleEndsAt!.isAfter(_saleStartsAt!)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('타임세일 종료가 시작보다 빠를 수 없습니다.')));
+        return;
+      }
+      if (salePrice >= int.parse(_price.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('타임세일가는 공동구매가보다 낮아야 합니다.')));
+        return;
+      }
     }
 
     final List<ProductOption> options;
@@ -191,6 +239,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       startsAt: _startsAt,
       endsAt: _endsAt,
       status: 'active',
+      salePrice: salePrice,
+      saleStartsAt: salePrice == null ? null : _saleStartsAt,
+      saleEndsAt: salePrice == null ? null : _saleEndsAt,
     );
 
     setState(() => _saving = true);
@@ -416,6 +467,65 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                             ),
                         ],
                       ),
+                      const SizedBox(height: 24),
+                      Text('타임세일 (선택)',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(
+                        '설정한 시간 동안 할인가가 자동 적용됩니다. 세일가를 비우면 해제됩니다.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _salePrice,
+                        decoration: const InputDecoration(
+                            labelText: '타임세일가 (원)',
+                            hintText: '공동구매가보다 낮게'),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('세일 시작'),
+                        trailing: TextButton.icon(
+                          icon: const Icon(Icons.edit_calendar_outlined),
+                          onPressed: () => _pickSaleDateTime(isEnd: false),
+                          label: Text(_saleStartsAt == null
+                              ? '선택'
+                              : formatDateTime(_saleStartsAt!)),
+                        ),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('세일 종료'),
+                        trailing: TextButton.icon(
+                          icon: const Icon(Icons.edit_calendar_outlined),
+                          onPressed: () => _pickSaleDateTime(isEnd: true),
+                          label: Text(_saleEndsAt == null
+                              ? '선택'
+                              : formatDateTime(_saleEndsAt!)),
+                        ),
+                      ),
+                      if (_salePrice.text.isNotEmpty ||
+                          _saleStartsAt != null ||
+                          _saleEndsAt != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.close, size: 16),
+                            label: const Text('타임세일 해제'),
+                            onPressed: () => setState(() {
+                              _salePrice.clear();
+                              _saleStartsAt = null;
+                              _saleEndsAt = null;
+                            }),
+                          ),
+                        ),
                       const SizedBox(height: 24),
                       Text('상품 이미지',
                           style: Theme.of(context).textTheme.titleMedium),

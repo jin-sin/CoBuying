@@ -391,13 +391,19 @@ class _ProductCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      if (product.discountRate != null) ...[
+                      if (product.isOnTimeSale) ...[
+                        const Icon(Icons.bolt, size: 18, color: Colors.red),
+                        Text('${product.saleDiscountRate}%',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.red, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 6),
+                      ] else if (product.discountRate != null) ...[
                         Text('${product.discountRate}%',
                             style: theme.textTheme.titleMedium?.copyWith(
                                 color: Colors.red, fontWeight: FontWeight.bold)),
                         const SizedBox(width: 6),
                       ],
-                      Text(formatWon(product.price),
+                      Text(formatWon(product.effectivePrice),
                           style: theme.textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold)),
                     ],
