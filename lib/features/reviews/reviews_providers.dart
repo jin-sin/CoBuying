@@ -19,6 +19,12 @@ final productReviewStatsProvider =
   (ref, productId) => ref.watch(reviewsRepositoryProvider).fetchStats(productId),
 );
 
+/// 전체 상품의 평점 집계 (목록 카드 배지용)
+final allReviewStatsProvider =
+    FutureProvider.autoDispose<Map<String, ReviewStats>>(
+  (ref) => ref.watch(reviewsRepositoryProvider).fetchAllStats(),
+);
+
 /// 내가 리뷰를 남긴 주문 아이템 id 집합 (주문 상세의 작성 버튼 표시용)
 final myReviewedItemIdsProvider =
     FutureProvider.autoDispose<Set<String>>((ref) {

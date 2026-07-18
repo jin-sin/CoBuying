@@ -64,7 +64,7 @@ class ProductReviewsSection extends ConsumerWidget {
               RatingStars(rating: stats.avgRating),
               const SizedBox(width: 4),
               Text(
-                '${stats.avgRating} (${stats.reviewCount})',
+                '${stats.avgLabel} (${stats.reviewCount})',
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: Colors.grey[600]),
               ),

@@ -25,6 +25,14 @@ class ReviewsRepository {
     return row == null ? null : ReviewStats.fromJson(row);
   }
 
+  /// 전체 상품의 평점 집계 (목록 카드 배지용, 상품 id → 집계)
+  Future<Map<String, ReviewStats>> fetchAllStats() async {
+    final rows = await _client.from('product_review_stats').select();
+    return {
+      for (final r in rows) r['product_id'] as String: ReviewStats.fromJson(r),
+    };
+  }
+
   /// 내가 리뷰를 남긴 주문 아이템 id 집합 (주문 상세의 작성 버튼 표시용)
   Future<Set<String>> fetchMyReviewedItemIds() async {
     final user = _client.auth.currentUser;

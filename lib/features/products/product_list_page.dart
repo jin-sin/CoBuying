@@ -7,6 +7,8 @@ import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
 import '../notifications/notifications_providers.dart';
+import '../reviews/review.dart';
+import '../reviews/reviews_providers.dart';
 import '../seller/seller_providers.dart';
 import 'categories.dart';
 import 'product.dart';
@@ -71,6 +73,9 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     final products = ref.watch(activeProductsProvider);
     final user = ref.watch(currentUserProvider);
     final cartCount = ref.watch(cartItemCountProvider);
+    // 평점 배지용 집계 (로딩/실패 시 배지만 생략)
+    final reviewStats =
+        ref.watch(allReviewStatsProvider).value ?? const <String, ReviewStats>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -170,7 +175,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => ref.refresh(activeProductsProvider.future),
+              onRefresh: () {
+                ref.invalidate(allReviewStatsProvider);
+                return ref.refresh(activeProductsProvider.future);
+              },
               child: products.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
@@ -203,8 +211,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                           childAspectRatio: 0.72,
                         ),
                         itemCount: filtered.length,
-                        itemBuilder: (context, i) =>
-                            _ProductCard(product: filtered[i]),
+                        itemBuilder: (context, i) => _ProductCard(
+                          product: filtered[i],
+                          stats: reviewStats[filtered[i].id],
+                        ),
                       );
                     },
                   );
@@ -341,9 +351,10 @@ class _ProfileMenu extends ConsumerWidget {
 }
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product});
+  const _ProductCard({required this.product, this.stats});
 
   final Product product;
+  final ReviewStats? stats;
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +403,21 @@ class _ProductCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  CountdownBadge(endsAt: product.endsAt, compact: true),
+                  Row(
+                    children: [
+                      CountdownBadge(endsAt: product.endsAt, compact: true),
+                      const Spacer(),
+                      if (stats != null && stats!.reviewCount > 0) ...[
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${stats!.avgLabel} (${stats!.reviewCount})',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),

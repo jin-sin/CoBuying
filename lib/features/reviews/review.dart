@@ -37,6 +37,9 @@ class ReviewStats {
   final int reviewCount;
   final double avgRating;
 
+  /// "4.5" 고정 표기 (웹/앱에서 double 문자열화가 달라지는 문제 방지)
+  String get avgLabel => avgRating.toStringAsFixed(1);
+
   factory ReviewStats.fromJson(Map<String, dynamic> json) => ReviewStats(
         reviewCount: json['review_count'] as int,
         avgRating: (json['avg_rating'] as num).toDouble(),
