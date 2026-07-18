@@ -1074,3 +1074,113 @@ insert into public.app_settings (key, value) values
    '{"enabled": true, "start": "02:00", "end": "08:00",
      "message": "break time ~ 지금은 서버 점검 시간이에요.\n아침에 다시 만나요!"}'::jsonb)
 on conflict (key) do nothing;
+
+-- ------------------------------------------------------------
+-- 21. 상품 리뷰
+--     배송 완료된 주문 아이템당 1건 (재구매하면 또 쓸 수 있음).
+--     profiles는 본인만 조회 가능하므로 닉네임은 작성 시점에
+--     마스킹된 스냅샷으로 저장한다 (예: "김**").
+-- ------------------------------------------------------------
+create table if not exists public.product_reviews (
+  id            uuid primary key default gen_random_uuid(),
+  product_id    uuid not null references public.products (id) on delete cascade,
+  order_item_id uuid not null unique references public.order_items (id) on delete cascade,
+  user_id       uuid not null references auth.users (id) on delete cascade,
+  nickname      text not null default '',
+  rating        integer not null check (rating between 1 and 5),
+  content       text not null default '',
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists idx_product_reviews_product
+  on public.product_reviews (product_id, created_at desc);
+create index if not exists idx_product_reviews_user
+  on public.product_reviews (user_id, created_at desc);
+
+-- 작성 시점 닉네임 스냅샷 (마스킹)
+create or replace function public.set_review_nickname()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_nick text;
+begin
+  select nickname into v_nick from public.profiles where id = new.user_id;
+  v_nick := coalesce(nullif(trim(v_nick), ''), '구매자');
+  new.nickname := left(v_nick, 1) || repeat('*', least(greatest(char_length(v_nick) - 1, 1), 2));
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_set_review_nickname on public.product_reviews;
+create trigger trg_set_review_nickname
+  before insert on public.product_reviews
+  for each row execute function public.set_review_nickname();
+
+-- 수정 시 대상 상품/주문 아이템/작성자·닉네임은 바꿀 수 없다 (평점·내용만 수정)
+create or replace function public.protect_review_immutables()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if new.product_id    is distinct from old.product_id
+     or new.order_item_id is distinct from old.order_item_id
+     or new.user_id    is distinct from old.user_id
+     or new.nickname   is distinct from old.nickname
+     or new.created_at is distinct from old.created_at then
+    raise exception '리뷰의 평점과 내용만 수정할 수 있습니다.';
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_protect_review_immutables on public.product_reviews;
+create trigger trg_protect_review_immutables
+  before update on public.product_reviews
+  for each row execute function public.protect_review_immutables();
+
+alter table public.product_reviews enable row level security;
+
+-- 조회는 누구나 (상품 상세는 로그인 전에도 보임)
+drop policy if exists "reviews_select" on public.product_reviews;
+create policy "reviews_select" on public.product_reviews
+  for select using (true);
+
+-- 작성: 본인 주문의 배송 완료된 아이템, 그 아이템의 상품에 대해서만
+drop policy if exists "reviews_insert" on public.product_reviews;
+create policy "reviews_insert" on public.product_reviews
+  for insert with check (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.order_items oi
+      join public.orders o on o.id = oi.order_id
+      where oi.id = order_item_id
+        and o.user_id = auth.uid()
+        and oi.product_id = product_reviews.product_id
+        and oi.status = 'delivered'
+    )
+  );
+
+-- 수정: 본인만 (immutable 컬럼은 트리거가 차단)
+drop policy if exists "reviews_update" on public.product_reviews;
+create policy "reviews_update" on public.product_reviews
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 삭제: 본인 또는 관리자(부적절 리뷰 중재)
+drop policy if exists "reviews_delete" on public.product_reviews;
+create policy "reviews_delete" on public.product_reviews
+  for delete using (user_id = auth.uid() or public.is_admin());
+
+-- 상품별 평점 집계 뷰
+create or replace view public.product_review_stats
+with (security_invoker = true) as
+  select product_id,
+         count(*)::int                        as review_count,
+         round(avg(rating)::numeric, 1)::float as avg_rating
+  from public.product_reviews
+  group by product_id;

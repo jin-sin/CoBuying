@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/env.dart';
 import '../../core/formatters.dart';
+import '../reviews/review_form_dialog.dart';
+import '../reviews/reviews_providers.dart';
 import 'order.dart';
 import 'orders_providers.dart';
 import 'toss_payment.dart';
@@ -130,9 +132,25 @@ class _OrderDetail extends ConsumerWidget {
     }
   }
 
+  Future<void> _writeReview(
+      BuildContext context, WidgetRef ref, OrderItem item) async {
+    final saved = await showReviewFormDialog(
+      context,
+      productId: item.productId,
+      orderItemId: item.id,
+    );
+    if (saved == true && context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('리뷰가 등록되었습니다.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    // 배송 완료된 아이템의 리뷰 작성 여부 (버튼 표시용)
+    final reviewedItemIds =
+        ref.watch(myReviewedItemIdsProvider).value ?? const <String>{};
 
     return Center(
       child: ConstrainedBox(
@@ -179,7 +197,7 @@ class _OrderDetail extends ConsumerWidget {
             _Section(
               title: '주문 상품',
               children: [
-                for (final item in order.items)
+                for (final item in order.items) ...[
                   _row(
                       '${item.productTitle}'
                       '${item.optionsLabel.isEmpty ? '' : ' (${item.optionsLabel})'}'
@@ -187,6 +205,29 @@ class _OrderDetail extends ConsumerWidget {
                       // 결제 완료 이후에는 상품별 배송 상태 표시 (셀러별로 다를 수 있음)
                       '${order.status == 'pending_payment' || order.status == 'cancelled' ? '' : ' · ${item.statusLabel}'}',
                       formatWon(item.lineTotal)),
+                  // 배송 완료된 상품만 리뷰 작성 가능 (아이템당 1건)
+                  if (order.status != 'pending_payment' &&
+                      order.status != 'cancelled' &&
+                      item.status == 'delivered' &&
+                      item.id != null &&
+                      item.productId != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: reviewedItemIds.contains(item.id)
+                          ? TextButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.check, size: 16),
+                              label: const Text('리뷰 작성 완료'),
+                            )
+                          : TextButton.icon(
+                              onPressed: () =>
+                                  _writeReview(context, ref, item),
+                              icon:
+                                  const Icon(Icons.rate_review_outlined, size: 16),
+                              label: const Text('리뷰 작성'),
+                            ),
+                    ),
+                ],
                 const Divider(),
                 _row('총 결제금액', formatWon(order.totalAmount), bold: true),
               ],

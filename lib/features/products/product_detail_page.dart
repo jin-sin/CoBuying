@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
+import '../reviews/widgets/product_reviews_section.dart';
 import 'product.dart';
 import 'products_providers.dart';
 import 'widgets/countdown_badge.dart';
@@ -194,6 +195,8 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                           const SizedBox(height: 8),
                           Text(product.description,
                               style: theme.textTheme.bodyLarge),
+                          const Divider(height: 32),
+                          ProductReviewsSection(productId: product.id),
                         ],
                       ),
                     ),
