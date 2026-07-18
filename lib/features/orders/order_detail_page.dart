@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/env.dart';
 import '../../core/formatters.dart';
 import '../reviews/review_form_dialog.dart';
 import '../reviews/reviews_providers.dart';
+import 'couriers.dart';
 import 'order.dart';
 import 'orders_providers.dart';
 import 'toss_payment.dart';
@@ -205,6 +207,32 @@ class _OrderDetail extends ConsumerWidget {
                       // 결제 완료 이후에는 상품별 배송 상태 표시 (셀러별로 다를 수 있음)
                       '${order.status == 'pending_payment' || order.status == 'cancelled' ? '' : ' · ${item.statusLabel}'}',
                       formatWon(item.lineTotal)),
+                  // 운송장 (셀러가 발송 처리 시 입력)
+                  if (order.status != 'pending_payment' &&
+                      order.status != 'cancelled' &&
+                      item.hasTracking)
+                    Row(
+                      children: [
+                        Icon(Icons.local_shipping_outlined,
+                            size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${item.courier} ${item.trackingNumber}',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600]),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => launchUrl(
+                            courierTrackingUrl(
+                                item.courier, item.trackingNumber),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          child: const Text('배송조회'),
+                        ),
+                      ],
+                    ),
                   // 배송 완료된 상품만 리뷰 작성 가능 (아이템당 1건)
                   if (order.status != 'pending_payment' &&
                       order.status != 'cancelled' &&

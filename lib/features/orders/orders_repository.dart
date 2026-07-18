@@ -95,10 +95,18 @@ class OrdersRepository {
 
   /// 셀러용: 자기 주문 아이템의 배송 상태 변경.
   /// 서버 RPC가 소유 검증과 주문 전체 상태 재계산을 처리한다.
-  Future<void> updateItemStatus(String itemId, String status) async {
+  /// 운송장(택배사·번호)은 넘긴 값만 갱신된다 (null이면 기존 값 유지).
+  Future<void> updateItemStatus(
+    String itemId,
+    String status, {
+    String? courier,
+    String? trackingNumber,
+  }) async {
     await _client.rpc('update_item_status', params: {
       'p_item_id': itemId,
       'p_status': status,
+      'p_courier': ?courier,
+      'p_tracking_number': ?trackingNumber,
     });
   }
 

@@ -9,6 +9,7 @@ import 'seller_apply_page.dart';
 import 'seller_profile.dart';
 import 'seller_providers.dart';
 import 'shipping_list_page.dart';
+import 'tracking_dialog.dart';
 
 /// 셀러센터.
 /// - 셀러 미신청: 입점 신청 폼
@@ -271,10 +272,27 @@ class _MySalesTab extends ConsumerWidget {
                                   ],
                                   onChanged: (s) async {
                                     if (s == null || s == item.status) return;
+                                    String? courier;
+                                    String? trackingNumber;
+                                    // 배송중 전환 시 운송장 입력 (건너뛰기 가능)
+                                    if (s == 'shipped') {
+                                      final t = await showTrackingDialog(
+                                        context,
+                                        initialCourier: item.courier,
+                                        initialNumber: item.trackingNumber,
+                                      );
+                                      if (t == null) return; // 취소
+                                      if (t.$2.isNotEmpty) {
+                                        courier = t.$1;
+                                        trackingNumber = t.$2;
+                                      }
+                                    }
                                     try {
                                       await ref
                                           .read(ordersRepositoryProvider)
-                                          .updateItemStatus(item.id!, s);
+                                          .updateItemStatus(item.id!, s,
+                                              courier: courier,
+                                              trackingNumber: trackingNumber);
                                       ref.invalidate(mySalesProvider);
                                     } catch (e) {
                                       if (context.mounted) {
@@ -286,6 +304,57 @@ class _MySalesTab extends ConsumerWidget {
                                     }
                                   },
                                 ),
+                                const Spacer(),
+                                // 발송 후 운송장 표시·수정
+                                if (item.status != 'preparing')
+                                  Flexible(
+                                    child: InkWell(
+                                      onTap: () async {
+                                        final t = await showTrackingDialog(
+                                          context,
+                                          initialCourier: item.courier,
+                                          initialNumber: item.trackingNumber,
+                                        );
+                                        if (t == null || t.$2.isEmpty) return;
+                                        try {
+                                          await ref
+                                              .read(ordersRepositoryProvider)
+                                              .updateItemStatus(
+                                                  item.id!, item.status,
+                                                  courier: t.$1,
+                                                  trackingNumber: t.$2);
+                                          ref.invalidate(mySalesProvider);
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(SnackBar(
+                                                    content: Text(
+                                                        '저장에 실패했습니다: $e')));
+                                          }
+                                        }
+                                      },
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              item.hasTracking
+                                                  ? '${item.courier} ${item.trackingNumber}'
+                                                  : '운송장 입력',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600]),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Icon(Icons.edit_outlined,
+                                              size: 14,
+                                              color: Colors.grey[600]),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),

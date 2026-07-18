@@ -1184,3 +1184,68 @@ with (security_invoker = true) as
          round(avg(rating)::numeric, 1)::float as avg_rating
   from public.product_reviews
   group by product_id;
+
+-- ------------------------------------------------------------
+-- 22. 운송장 번호
+--     셀러가 배송중 처리 시 택배사·운송장 번호를 입력하면
+--     구매자 주문 상세에서 배송조회 링크로 보여준다.
+--     택배사 목록·조회 URL은 앱(lib/features/orders/couriers.dart)에서 관리.
+-- ------------------------------------------------------------
+alter table public.order_items
+  add column if not exists courier         text not null default '',
+  add column if not exists tracking_number text not null default '';
+
+-- update_item_status 확장: 운송장 파라미터 추가.
+-- 시그니처가 다른 함수가 남아 있으면 PostgREST RPC 호출이 모호해지므로 기존 것을 drop.
+drop function if exists public.update_item_status(uuid, text);
+
+create or replace function public.update_item_status(
+  p_item_id         uuid,
+  p_status          text,
+  p_courier         text default null,
+  p_tracking_number text default null
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_item  public.order_items%rowtype;
+  v_order public.orders%rowtype;
+  v_stage integer;
+begin
+  if p_status not in ('preparing', 'shipped', 'delivered') then
+    raise exception '허용되지 않는 배송 상태입니다: %', p_status;
+  end if;
+
+  select * into v_item from public.order_items where id = p_item_id;
+  if not found or (v_item.seller_id <> auth.uid() and not public.is_admin()) then
+    raise exception '본인 판매 상품만 변경할 수 있습니다.';
+  end if;
+
+  -- 주문 행 잠금: 여러 셀러가 동시에 변경해도 재계산이 꼬이지 않게
+  select * into v_order from public.orders where id = v_item.order_id for update;
+  if v_order.status in ('pending_payment', 'cancelled') then
+    raise exception '결제 완료된 주문만 배송 상태를 변경할 수 있습니다.';
+  end if;
+
+  update public.order_items
+  set status          = p_status,
+      courier         = coalesce(p_courier, courier),
+      tracking_number = coalesce(p_tracking_number, tracking_number)
+  where id = p_item_id;
+
+  -- 주문 상태 = 아이템들 중 가장 느린 배송 단계
+  select min(case status when 'preparing' then 1 when 'shipped' then 2 else 3 end)
+    into v_stage
+  from public.order_items
+  where order_id = v_item.order_id;
+
+  update public.orders
+  set status = case v_stage when 1 then 'preparing'
+                            when 2 then 'shipped'
+                            else 'delivered' end,
+      updated_at = now()
+  where id = v_item.order_id;
+end;
+$$;

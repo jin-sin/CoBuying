@@ -76,6 +76,8 @@ class OrderItem {
     this.feeAmount = 0,
     this.status = 'preparing',
     this.selectedOptions = const {},
+    this.courier = '',
+    this.trackingNumber = '',
   });
 
   final String? id;
@@ -88,6 +90,10 @@ class OrderItem {
   final int feeAmount; // 플랫폼 수수료 (원)
   final String status; // 아이템별 배송 상태 (셀러가 관리)
   final Map<String, String> selectedOptions; // 주문 시점 옵션 스냅샷
+  final String courier; // 택배사 (배송중 처리 시 셀러가 입력)
+  final String trackingNumber; // 운송장 번호
+
+  bool get hasTracking => trackingNumber.isNotEmpty;
 
   int get lineTotal => unitPrice * quantity;
 
@@ -118,5 +124,7 @@ class OrderItem {
         selectedOptions: (json['selected_options'] as Map<String, dynamic>? ??
                 const {})
             .map((k, v) => MapEntry(k, v.toString())),
+        courier: json['courier'] as String? ?? '',
+        trackingNumber: json['tracking_number'] as String? ?? '',
       );
 }
