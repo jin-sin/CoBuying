@@ -1186,6 +1186,40 @@ with (security_invoker = true) as
   group by product_id;
 
 -- ------------------------------------------------------------
+-- 21-1. 리뷰 좋아요 (도움돼요)
+--       리뷰 작성 동기 부여용. 리뷰당 사용자 1표, 본인 리뷰에는 불가.
+-- ------------------------------------------------------------
+create table if not exists public.review_likes (
+  review_id  uuid not null references public.product_reviews (id) on delete cascade,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (review_id, user_id)
+);
+
+alter table public.review_likes enable row level security;
+
+-- 개수 표시는 로그인 전에도 필요
+drop policy if exists "review_likes_select" on public.review_likes;
+create policy "review_likes_select" on public.review_likes
+  for select using (true);
+
+-- 좋아요: 로그인 사용자, 본인 리뷰는 제외
+drop policy if exists "review_likes_insert" on public.review_likes;
+create policy "review_likes_insert" on public.review_likes
+  for insert with check (
+    user_id = auth.uid()
+    and not exists (
+      select 1 from public.product_reviews r
+      where r.id = review_id and r.user_id = auth.uid()
+    )
+  );
+
+-- 취소: 본인 것만
+drop policy if exists "review_likes_delete" on public.review_likes;
+create policy "review_likes_delete" on public.review_likes
+  for delete using (user_id = auth.uid());
+
+-- ------------------------------------------------------------
 -- 22. 운송장 번호
 --     셀러가 배송중 처리 시 택배사·운송장 번호를 입력하면
 --     구매자 주문 상세에서 배송조회 링크로 보여준다.

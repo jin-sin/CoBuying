@@ -10,10 +10,28 @@ class ReviewsRepository {
   Future<List<Review>> fetchProductReviews(String productId) async {
     final rows = await _client
         .from('product_reviews')
-        .select()
+        .select('*, review_likes(user_id)')
         .eq('product_id', productId)
         .order('created_at', ascending: false);
     return rows.map(Review.fromJson).toList();
+  }
+
+  /// 리뷰 좋아요 토글. 서버 RLS가 본인 리뷰 제외·중복 방지를 검증한다.
+  Future<void> setLiked(String reviewId, bool liked) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw StateError('로그인이 필요합니다.');
+    if (liked) {
+      await _client.from('review_likes').insert({
+        'review_id': reviewId,
+        'user_id': user.id,
+      });
+    } else {
+      await _client
+          .from('review_likes')
+          .delete()
+          .eq('review_id', reviewId)
+          .eq('user_id', user.id);
+    }
   }
 
   Future<ReviewStats?> fetchStats(String productId) async {

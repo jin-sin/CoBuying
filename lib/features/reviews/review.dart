@@ -8,6 +8,7 @@ class Review {
     required this.rating,
     required this.content,
     required this.createdAt,
+    this.likedUserIds = const {},
   });
 
   final String id;
@@ -18,6 +19,11 @@ class Review {
   final int rating; // 1~5
   final String content;
   final DateTime createdAt;
+  final Set<String> likedUserIds; // 좋아요 누른 사용자 (review_likes 임베드)
+
+  int get likeCount => likedUserIds.length;
+  bool likedBy(String? userId) =>
+      userId != null && likedUserIds.contains(userId);
 
   factory Review.fromJson(Map<String, dynamic> json) => Review(
         id: json['id'] as String,
@@ -28,6 +34,10 @@ class Review {
         rating: json['rating'] as int,
         content: json['content'] as String? ?? '',
         createdAt: DateTime.parse(json['created_at'] as String),
+        likedUserIds: {
+          for (final l in json['review_likes'] as List<dynamic>? ?? [])
+            (l as Map<String, dynamic>)['user_id'] as String,
+        },
       );
 }
 

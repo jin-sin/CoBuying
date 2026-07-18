@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/formatters.dart';
 import '../../auth/auth_providers.dart';
@@ -13,6 +14,23 @@ class ProductReviewsSection extends ConsumerWidget {
   const ProductReviewsSection({super.key, required this.productId});
 
   final String productId;
+
+  Future<void> _toggleLike(
+      BuildContext context, WidgetRef ref, Review review, bool liked) async {
+    if (ref.read(currentUserProvider) == null) {
+      context.push('/login');
+      return;
+    }
+    try {
+      await ref.read(reviewsRepositoryProvider).setLiked(review.id, liked);
+      ref.invalidate(productReviewsProvider(productId));
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('처리에 실패했습니다: $e')));
+      }
+    }
+  }
 
   Future<void> _deleteReview(
       BuildContext context, WidgetRef ref, Review review) async {
@@ -93,9 +111,12 @@ class ProductReviewsSection extends ConsumerWidget {
                     review: review,
                     isMine: review.userId == userId,
                     canDelete: review.userId == userId || isAdmin,
+                    liked: review.likedBy(userId),
                     onEdit: () =>
                         showReviewFormDialog(context, existing: review),
                     onDelete: () => _deleteReview(context, ref, review),
+                    onLikeToggle: (liked) =>
+                        _toggleLike(context, ref, review, liked),
                   ),
               ],
             );
@@ -111,15 +132,19 @@ class _ReviewTile extends StatelessWidget {
     required this.review,
     required this.isMine,
     required this.canDelete,
+    required this.liked,
     required this.onEdit,
     required this.onDelete,
+    required this.onLikeToggle,
   });
 
   final Review review;
   final bool isMine;
   final bool canDelete;
+  final bool liked;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final ValueChanged<bool> onLikeToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +186,36 @@ class _ReviewTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(review.content, style: theme.textTheme.bodyMedium),
           ],
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            // 본인 리뷰에는 좋아요 불가 (서버 RLS와 동일) — 개수만 표시
+            child: isMine
+                ? (review.likeCount > 0
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        child: Text('👍 도움돼요 ${review.likeCount}',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600])),
+                      )
+                    : const SizedBox.shrink())
+                : OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      textStyle: theme.textTheme.bodySmall,
+                    ),
+                    icon: Icon(
+                      liked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                      size: 14,
+                    ),
+                    label: Text(review.likeCount > 0
+                        ? '도움돼요 ${review.likeCount}'
+                        : '도움돼요'),
+                    onPressed: () => onLikeToggle(!liked),
+                  ),
+          ),
         ],
       ),
     );

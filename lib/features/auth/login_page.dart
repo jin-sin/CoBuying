@@ -57,29 +57,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 40),
+                // 네이버·페이스북은 프로바이더 연동 전이라 미노출 (카카오만 운영)
                 _SocialButton(
                   label: '카카오로 시작하기',
                   background: const Color(0xFFFEE500),
                   foreground: Colors.black87,
                   icon: Icons.chat_bubble,
                   onPressed: _busy ? null : () => _signIn(auth.signInWithKakao),
-                ),
-                const SizedBox(height: 12),
-                _SocialButton(
-                  label: '네이버로 시작하기',
-                  background: const Color(0xFF03C75A),
-                  foreground: Colors.white,
-                  icon: Icons.eco,
-                  onPressed: _busy ? null : () => _signIn(auth.signInWithNaver),
-                ),
-                const SizedBox(height: 12),
-                _SocialButton(
-                  label: '페이스북으로 시작하기',
-                  background: const Color(0xFF1877F2),
-                  foreground: Colors.white,
-                  icon: Icons.facebook,
-                  onPressed:
-                      _busy ? null : () => _signIn(auth.signInWithFacebook),
                 ),
                 if (_busy) ...[
                   const SizedBox(height: 24),
