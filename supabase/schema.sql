@@ -1445,3 +1445,112 @@ begin
   return v_order_id;
 end;
 $$;
+
+-- ------------------------------------------------------------
+-- 24. 찜(위시리스트) + 타임세일 알림
+--     찜한 상품의 타임세일이 시작되면 인앱 알림, 마감 1시간 전에
+--     임박 알림을 보낸다 (90분 이하 짧은 세일은 시작 알림만).
+--     중복 발송 방지는 products의 발송 마커 컬럼으로.
+-- ------------------------------------------------------------
+create table if not exists public.wishlists (
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  product_id uuid not null references public.products (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, product_id)
+);
+
+create index if not exists idx_wishlists_product on public.wishlists (product_id);
+
+alter table public.wishlists enable row level security;
+
+drop policy if exists "wishlists_owner" on public.wishlists;
+create policy "wishlists_owner" on public.wishlists
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 타임세일 알림 발송 마커
+alter table public.products
+  add column if not exists sale_start_notified_at timestamptz,
+  add column if not exists sale_ending_notified_at timestamptz;
+
+-- 세일 일정이 바뀌면 마커 초기화 (새 세일은 다시 알림)
+create or replace function public.reset_sale_notify_markers()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.sale_price     is distinct from old.sale_price
+     or new.sale_starts_at is distinct from old.sale_starts_at
+     or new.sale_ends_at   is distinct from old.sale_ends_at then
+    new.sale_start_notified_at  := null;
+    new.sale_ending_notified_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_reset_sale_notify_markers on public.products;
+create trigger trg_reset_sale_notify_markers
+  before update on public.products
+  for each row execute function public.reset_sale_notify_markers();
+
+-- 찜한 사용자에게 타임세일 시작·마감 임박 알림 (pg_cron이 1분마다 호출)
+create or replace function public.notify_time_sales()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_product record;
+begin
+  -- 세일 시작 알림
+  for v_product in
+    select * from public.products
+    where status = 'active'
+      and sale_price is not null and sale_price < price
+      and now() >= sale_starts_at and now() < sale_ends_at
+      and starts_at <= now() and ends_at > now()
+      and sale_start_notified_at is null
+  loop
+    insert into public.notifications (user_id, title, body, link)
+    select w.user_id,
+           '⚡ 찜한 상품 타임세일 시작!',
+           v_product.title || ' — ' || to_char(v_product.sale_price, 'FM999,999,999') || '원 (' ||
+             to_char(v_product.sale_ends_at at time zone 'Asia/Seoul', 'HH24:MI') || ' 까지)',
+           '/product/' || v_product.id
+    from public.wishlists w
+    where w.product_id = v_product.id;
+
+    update public.products set sale_start_notified_at = now()
+    where id = v_product.id;
+  end loop;
+
+  -- 마감 1시간 전 임박 알림 (90분 넘는 세일만 — 짧은 세일은 시작 알림으로 충분)
+  for v_product in
+    select * from public.products
+    where status = 'active'
+      and sale_price is not null and sale_price < price
+      and now() >= sale_ends_at - interval '1 hour' and now() < sale_ends_at
+      and sale_ends_at - sale_starts_at > interval '90 minutes'
+      and starts_at <= now() and ends_at > now()
+      and sale_ending_notified_at is null
+  loop
+    insert into public.notifications (user_id, title, body, link)
+    select w.user_id,
+           '⏰ 타임세일이 곧 끝나요',
+           v_product.title || ' 세일이 ' ||
+             to_char(v_product.sale_ends_at at time zone 'Asia/Seoul', 'HH24:MI') || '에 종료됩니다.',
+           '/product/' || v_product.id
+    from public.wishlists w
+    where w.product_id = v_product.id;
+
+    update public.products set sale_ending_notified_at = now()
+    where id = v_product.id;
+  end loop;
+end;
+$$;
+
+select cron.schedule(
+  'notify-time-sales',
+  '* * * * *',
+  $$ select public.notify_time_sales() $$
+);

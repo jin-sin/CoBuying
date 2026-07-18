@@ -17,10 +17,12 @@ import '../features/orders/payment_result_page.dart';
 import '../features/products/product_detail_page.dart';
 import '../features/products/product_list_page.dart';
 import '../features/seller/seller_home_page.dart';
+import '../features/wishlist/wishlist_page.dart';
 
 /// 로그인이 필요한 경로
 const _authRequired = {
   '/cart', '/checkout', '/orders', '/seller', '/payment', '/notifications',
+  '/wishlist',
 };
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -52,6 +54,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ProductDetailPage(productId: state.pathParameters['id']!),
       ),
       GoRoute(path: '/cart', builder: (_, _) => const CartPage()),
+      GoRoute(path: '/wishlist', builder: (_, _) => const WishlistPage()),
       GoRoute(path: '/checkout', builder: (_, _) => const CheckoutPage()),
       GoRoute(path: '/orders', builder: (_, _) => const OrderListPage()),
       GoRoute(

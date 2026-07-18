@@ -10,6 +10,7 @@ import '../notifications/notifications_providers.dart';
 import '../reviews/review.dart';
 import '../reviews/reviews_providers.dart';
 import '../seller/seller_providers.dart';
+import '../wishlist/wishlist_providers.dart';
 import 'categories.dart';
 import 'product.dart';
 import 'products_providers.dart';
@@ -45,6 +46,24 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     super.dispose();
   }
 
+  Future<void> _toggleWish(Product product, bool wished) async {
+    if (ref.read(currentUserProvider) == null) {
+      context.push('/login');
+      return;
+    }
+    try {
+      await ref
+          .read(wishlistRepositoryProvider)
+          .setWished(product.id, wished);
+      ref.invalidate(myWishlistIdsProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('처리에 실패했습니다: $e')));
+      }
+    }
+  }
+
   List<Product> _apply(List<Product> items) {
     final q = _query.trim().toLowerCase();
     final list = items.where((p) {
@@ -76,6 +95,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     // 평점 배지용 집계 (로딩/실패 시 배지만 생략)
     final reviewStats =
         ref.watch(allReviewStatsProvider).value ?? const <String, ReviewStats>{};
+    final wishedIds = ref.watch(myWishlistIdsProvider).value ?? const <String>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -214,6 +234,9 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                         itemBuilder: (context, i) => _ProductCard(
                           product: filtered[i],
                           stats: reviewStats[filtered[i].id],
+                          wished: wishedIds.contains(filtered[i].id),
+                          onWishToggle: (wished) =>
+                              _toggleWish(filtered[i], wished),
                         ),
                       );
                     },
@@ -306,6 +329,8 @@ class _ProfileMenu extends ConsumerWidget {
         switch (value) {
           case 'orders':
             context.push('/orders');
+          case 'wishlist':
+            context.push('/wishlist');
           case 'seller':
             context.push('/seller');
           case 'admin':
@@ -320,6 +345,13 @@ class _ProfileMenu extends ConsumerWidget {
           child: ListTile(
             leading: Icon(Icons.receipt_long_outlined),
             title: Text('주문 내역'),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'wishlist',
+          child: ListTile(
+            leading: Icon(Icons.favorite_border),
+            title: Text('찜한 상품'),
           ),
         ),
         PopupMenuItem(
@@ -351,10 +383,17 @@ class _ProfileMenu extends ConsumerWidget {
 }
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, this.stats});
+  const _ProductCard({
+    required this.product,
+    this.stats,
+    this.wished = false,
+    this.onWishToggle,
+  });
 
   final Product product;
   final ReviewStats? stats;
+  final bool wished;
+  final ValueChanged<bool>? onWishToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -367,17 +406,37 @@ class _ProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: product.imageUrls.isEmpty
-                  ? Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.image_outlined, size: 48),
-                    )
-                  : CachedNetworkImage(
-                      imageUrl: product.imageUrls.first,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, _, _) =>
-                          const Icon(Icons.broken_image_outlined),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  product.imageUrls.isEmpty
+                      ? Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.image_outlined, size: 48),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: product.imageUrls.first,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, _, _) =>
+                              const Icon(Icons.broken_image_outlined),
+                        ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black26,
+                      ),
+                      icon: Icon(
+                        wished ? Icons.favorite : Icons.favorite_border,
+                        color: wished ? Colors.red : Colors.white,
+                      ),
+                      tooltip: wished ? '찜 해제' : '찜하기',
+                      onPressed: () => onWishToggle?.call(!wished),
                     ),
+                  ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(12),

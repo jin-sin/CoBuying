@@ -7,6 +7,7 @@ import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
 import '../reviews/widgets/product_reviews_section.dart';
+import '../wishlist/wishlist_providers.dart';
 import 'product.dart';
 import 'products_providers.dart';
 import 'widgets/countdown_badge.dart';
@@ -60,12 +61,49 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
     }
   }
 
+  Future<void> _toggleWish(bool wished) async {
+    if (ref.read(currentUserProvider) == null) {
+      context.push('/login');
+      return;
+    }
+    try {
+      await ref
+          .read(wishlistRepositoryProvider)
+          .setWished(widget.productId, wished);
+      ref.invalidate(myWishlistIdsProvider);
+      if (wished && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('찜했습니다. 타임세일이 시작되면 알림을 보내드려요.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('처리에 실패했습니다: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productProvider(widget.productId));
+    final wished = (ref.watch(myWishlistIdsProvider).value ?? const {})
+        .contains(widget.productId);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('상품 상세')),
+      appBar: AppBar(
+        title: const Text('상품 상세'),
+        actions: [
+          IconButton(
+            icon: Icon(
+              wished ? Icons.favorite : Icons.favorite_border,
+              color: wished ? Colors.red : null,
+            ),
+            tooltip: wished ? '찜 해제' : '찜하기',
+            onPressed: () => _toggleWish(!wished),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: productAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('상품을 불러오지 못했습니다.\n$e')),
