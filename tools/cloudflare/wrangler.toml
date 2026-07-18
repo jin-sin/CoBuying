@@ -1,0 +1,9 @@
+name = "orange-man-maintenance"
+main = "maintenance-worker.js"
+compatibility_date = "2026-07-01"
+
+# 점검 안내를 씌울 호스트들 (zone이 Cloudflare에 등록돼 있어야 함)
+routes = [
+  { pattern = "shop.orange-man.xyz/*", zone_name = "orange-man.xyz" },
+  { pattern = "photo.orange-man.xyz/*", zone_name = "orange-man.xyz" },
+]
