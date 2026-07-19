@@ -1554,3 +1554,167 @@ select cron.schedule(
   '* * * * *',
   $$ select public.notify_time_sales() $$
 );
+
+-- ------------------------------------------------------------
+-- 25. FCM 푸시 알림
+--     인앱 알림(notifications) insert를 트리거가 push_queue에 적재하고,
+--     pg_cron이 1분마다 Cloudflare Worker(tools/cloudflare/push-worker)로
+--     배치 전송한다. FCM v1 API는 OAuth(RS256 서명)가 필요해 DB에서 직접
+--     못 부르므로 Worker가 Firebase 서비스 계정으로 대신 발송한다.
+--     private.app_secrets에 push_worker_url / push_shared_secret을
+--     등록해야 동작 — 미등록이면 큐만 비우고 조용히 건너뛴다.
+-- ------------------------------------------------------------
+create table if not exists public.push_tokens (
+  token      text primary key,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  platform   text not null default '',   -- android / ios / web
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_push_tokens_user on public.push_tokens (user_id);
+
+-- 정책 없음 — 아래 security definer RPC로만 등록/해제
+alter table public.push_tokens enable row level security;
+
+-- 토큰 등록. 같은 기기에서 다른 계정으로 로그인하면 소유자가 바뀌므로
+-- (RLS upsert로는 타인 row를 못 건드림) definer RPC로 이전 처리한다.
+create or replace function public.register_push_token(
+  p_token    text,
+  p_platform text default ''
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+  insert into public.push_tokens (token, user_id, platform)
+  values (p_token, auth.uid(), p_platform)
+  on conflict (token) do update
+    set user_id = excluded.user_id,
+        platform = excluded.platform,
+        updated_at = now();
+end;
+$$;
+
+-- 로그아웃 시 이 기기 토큰을 계정에서 분리
+create or replace function public.unregister_push_token(p_token text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.push_tokens
+  where token = p_token and user_id = auth.uid();
+end;
+$$;
+
+create table if not exists public.push_queue (
+  id              bigint generated always as identity primary key,
+  notification_id uuid not null references public.notifications (id) on delete cascade,
+  created_at      timestamptz not null default now()
+);
+
+-- 정책 없음 — 트리거/크론 전용 내부 테이블
+alter table public.push_queue enable row level security;
+
+create or replace function public.enqueue_push()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  -- 등록된 기기가 없는 사용자는 큐에 쌓지 않는다
+  if exists (select 1 from public.push_tokens where user_id = new.user_id) then
+    insert into public.push_queue (notification_id) values (new.id);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enqueue_push on public.notifications;
+create trigger trg_enqueue_push
+  after insert on public.notifications
+  for each row execute function public.enqueue_push();
+
+create or replace function public.send_push_notifications()
+returns void
+language plpgsql
+security definer set search_path = public, extensions
+as $fn$
+declare
+  v_url     text;
+  v_secret  text;
+  v_ids     bigint[];
+  v_batch   jsonb;
+  v_resp    http_response;
+  v_invalid jsonb;
+begin
+  select value into v_url    from private.app_secrets where key = 'push_worker_url';
+  select value into v_secret from private.app_secrets where key = 'push_shared_secret';
+
+  -- 푸시 미설정 상태 — 큐가 무한히 자라지 않게 비우기만 한다
+  if v_url is null or v_secret is null then
+    delete from public.push_queue;
+    return;
+  end if;
+
+  -- 1시간 넘게 못 보낸 건 폐기 (푸시는 즉시성이 생명)
+  delete from public.push_queue where created_at < now() - interval '1 hour';
+
+  -- 한 번에 25건 — Worker 무료 플랜의 요청당 서브요청 50개 제한 고려
+  -- (사용자당 기기 1~2개 가정). 남은 건 다음 분에 이어서 보낸다.
+  select array_agg(distinct q.id),
+         jsonb_agg(jsonb_build_object(
+           'token', t.token,
+           'title', n.title,
+           'body',  n.body,
+           'link',  n.link))
+    into v_ids, v_batch
+  from (select id, notification_id from public.push_queue
+        order by id limit 25
+        for update skip locked) q
+  join public.notifications n on n.id = q.notification_id
+  join public.push_tokens t on t.user_id = n.user_id;
+
+  if v_batch is null then
+    return;
+  end if;
+
+  perform http_set_curlopt('CURLOPT_TIMEOUT', '30');
+
+  v_resp := http((
+    'POST',
+    v_url,
+    array[http_header('Authorization', 'Bearer ' || v_secret)],
+    'application/json',
+    jsonb_build_object('messages', v_batch)::text
+  )::http_request);
+
+  -- 실패 시 큐 유지 → 다음 분에 재시도 (1시간 지나면 위에서 폐기)
+  if v_resp.status <> 200 then
+    raise warning 'push worker HTTP %: %', v_resp.status, left(v_resp.content, 200);
+    return;
+  end if;
+
+  -- FCM이 무효(UNREGISTERED)라고 알려준 토큰 정리
+  v_invalid := (v_resp.content::jsonb) -> 'invalid';
+  if v_invalid is not null and jsonb_typeof(v_invalid) = 'array' then
+    delete from public.push_tokens
+    where token in (select jsonb_array_elements_text(v_invalid));
+  end if;
+
+  delete from public.push_queue where id = any (v_ids);
+end;
+$fn$;
+
+-- 크론 전용 — 클라이언트가 임의로 발송을 트리거하지 못하게 차단
+revoke execute on function public.send_push_notifications() from public, anon, authenticated;
+
+select cron.schedule(
+  'send-push-notifications',
+  '* * * * *',
+  $$ select public.send_push_notifications() $$
+);

@@ -1,0 +1,10 @@
+name = "cobuying-push"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# 라우트 없이 workers.dev 주소로 배포 — DB(pg_cron)만 호출한다.
+workers_dev = true
+
+[vars]
+# 웹 푸시 클릭 시 열 서비스 웹 주소 (Flutter 웹 해시 라우팅 기준)
+WEB_LINK_BASE = "https://shop.orange-man.xyz"

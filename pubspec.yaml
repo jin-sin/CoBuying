@@ -47,6 +47,8 @@ dependencies:
   url_launcher: ^6.3.2
   kakao_flutter_sdk_user: ^2.0.0+1
   shared_preferences: ^2.5.5
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
 
 dev_dependencies:
   flutter_test:

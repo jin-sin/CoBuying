@@ -7,6 +7,7 @@ import '../../core/formatters.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
 import '../notifications/notifications_providers.dart';
+import '../notifications/push/push_providers.dart';
 import '../reviews/review.dart';
 import '../reviews/reviews_providers.dart';
 import '../seller/seller_providers.dart';
@@ -336,7 +337,11 @@ class _ProfileMenu extends ConsumerWidget {
           case 'admin':
             context.push('/admin');
           case 'logout':
-            ref.read(authRepositoryProvider).signOut();
+            // 토큰 해제는 세션이 살아있을 때만 가능하므로 로그아웃보다 먼저
+            ref
+                .read(pushServiceProvider)
+                .unregister()
+                .then((_) => ref.read(authRepositoryProvider).signOut());
         }
       },
       itemBuilder: (_) => [

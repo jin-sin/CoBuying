@@ -48,4 +48,4 @@ app.*.map.json
 /.claude/
 
 # wrangler 로컬 상태
-tools/cloudflare/.wrangler/
+tools/cloudflare/**/.wrangler/

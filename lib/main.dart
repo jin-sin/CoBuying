@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/env.dart';
 import 'core/theme.dart';
 import 'features/maintenance/maintenance_gate.dart';
+import 'features/notifications/push/push_providers.dart';
 import 'features/orders/payment_result_page.dart';
 import 'router/app_router.dart';
 
@@ -34,11 +35,23 @@ Future<void> main() async {
   runApp(const ProviderScope(child: CoBuyingApp()));
 }
 
-class CoBuyingApp extends ConsumerWidget {
+class CoBuyingApp extends ConsumerStatefulWidget {
   const CoBuyingApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CoBuyingApp> createState() => _CoBuyingAppState();
+}
+
+class _CoBuyingAppState extends ConsumerState<CoBuyingApp> {
+  @override
+  void initState() {
+    super.initState();
+    // FCM 푸시 — Firebase 미설정이면 내부에서 조용히 건너뛴다
+    Future.microtask(() => ref.read(pushServiceProvider).init());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
