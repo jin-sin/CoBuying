@@ -85,5 +85,18 @@ flutter run --dart-define=SUPABASE_URL=https://<supabase주소> \
 ```
 
 ## 7. 백업
-- Container Manager에서 `supabase-db` 볼륨 경로(`docker/volumes/db/data`)를
-  Hyper Backup 대상에 포함시키는 것을 권장합니다.
+매일 pg_dump 백업 스크립트가 NAS에 설치돼 있다 (`/volume1/docker/supabase/backup.sh`,
+레포 사본은 `supabase/backup.sh`). 최근 14개를 `backups/`에 보관.
+
+**DSM 작업 스케줄러 등록** (제어판 > 작업 스케줄러 > 생성 > 예약된 작업 > 사용자 정의 스크립트):
+- 사용자: shinnas_admin, 스케줄: 매일 01:30 (NAS 전원 오프 전),
+- 실행 명령: `/volume1/docker/supabase/backup.sh`
+
+복원:
+```bash
+docker exec -i supabase-db pg_restore -U supabase_admin -d postgres \
+  --clean --if-exists < backups/cobuying-<날짜>.dump
+```
+
+추가로 상품 이미지(`volumes/storage`)와 `.env`는 Hyper Backup 대상에
+포함시키는 것을 권장 (오프사이트 백업).
