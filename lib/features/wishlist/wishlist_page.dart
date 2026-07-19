@@ -1,13 +1,14 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/formatters.dart';
+import '../../core/widgets.dart';
 import '../products/product.dart';
+import '../products/widgets/product_card.dart';
+import '../reviews/reviews_providers.dart';
 import 'wishlist_providers.dart';
 
-/// 찜한 상품 목록. 판매 종료된 상품도 남겨서 재판매 때 알림을 받게 한다.
+/// 찜한 상품 목록 — 홈과 같은 온이미지 카드 그리드 (시안 C).
+/// 판매 종료된 상품도 남겨서 재판매 때 알림을 받게 한다 (바랜 처리).
 class WishlistPage extends ConsumerWidget {
   const WishlistPage({super.key});
 
@@ -28,6 +29,7 @@ class WishlistPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(myWishlistProductsProvider);
+    final reviewStats = ref.watch(allReviewStatsProvider).value;
 
     return Scaffold(
       appBar: AppBar(title: const Text('찜한 상품')),
@@ -36,64 +38,35 @@ class WishlistPage extends ConsumerWidget {
         error: (e, _) => Center(child: Text('불러오기 실패\n$e')),
         data: (products) {
           if (products.isEmpty) {
-            return const Center(
-              child: Text('찜한 상품이 없습니다.\n상품의 ♡를 눌러 찜하면 타임세일 알림을 받아요.',
-                  textAlign: TextAlign.center),
+            return const EmptyState(
+              icon: Icons.favorite_border,
+              message: '찜한 상품이 없습니다.\n상품의 ♡를 눌러 찜하면 타임세일 알림을 받아요.',
             );
           }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(myWishlistProductsProvider.future),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: products.length,
-              itemBuilder: (context, i) {
-                final p = products[i];
-                final theme = Theme.of(context);
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: p.imageUrls.isEmpty
-                            ? Container(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                child: const Icon(Icons.image_outlined),
-                              )
-                            : CachedNetworkImage(
-                                imageUrl: p.imageUrls.first,
-                                fit: BoxFit.cover),
-                      ),
-                    ),
-                    title: Text(p.title,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                      p.isOnTimeSale
-                          ? '⚡ 타임세일 ${formatWon(p.effectivePrice)}'
-                          : p.isOnSale
-                              ? formatWon(p.price)
-                              : '판매 종료',
-                      style: TextStyle(
-                        color: p.isOnTimeSale
-                            ? Colors.red
-                            : p.isOnSale
-                                ? null
-                                : Colors.grey,
-                        fontWeight: p.isOnTimeSale ? FontWeight.bold : null,
-                      ),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.favorite, color: Colors.red),
-                      tooltip: '찜 해제',
-                      onPressed: () => _remove(context, ref, p),
-                    ),
-                    onTap: () => context.push('/product/${p.id}'),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1080),
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate:
+                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 250,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    childAspectRatio: 0.78,
                   ),
-                );
-              },
+                  itemCount: products.length,
+                  itemBuilder: (context, i) => ProductCard(
+                    product: products[i],
+                    stats: reviewStats?[products[i].id],
+                    wished: true,
+                    onWishToggle: (_) =>
+                        _remove(context, ref, products[i]),
+                  ),
+                ),
+              ),
             ),
           );
         },

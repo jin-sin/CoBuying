@@ -6,6 +6,7 @@ import 'package:postal_ko/postal_ko.dart';
 
 import '../../core/env.dart';
 import '../../core/formatters.dart';
+import '../../core/widgets.dart';
 import '../cart/cart_providers.dart';
 import 'orders_providers.dart';
 import 'postcode_fix.dart';
@@ -159,7 +160,8 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                     children: [
                       Text('주문 상품', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      Card(
+                      SoftCard(
+                        padding: EdgeInsets.zero,
                         child: Column(
                           children: [
                             for (final item in orderable)

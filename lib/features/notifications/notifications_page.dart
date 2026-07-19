@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
 import 'app_notification.dart';
 import 'notifications_providers.dart';
 
@@ -51,9 +52,10 @@ class NotificationsPage extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.notifications_none, size: 64, color: Colors.grey),
+                  Icon(Icons.notifications_none,
+                      size: 64, color: Color(0xFFB9B1A8)),
                   SizedBox(height: 16),
-                  Text('알림이 없습니다.'),
+                  Text('알림이 없습니다.', style: TextStyle(color: mutedText)),
                 ],
               ),
             );
@@ -68,19 +70,46 @@ class NotificationsPage extends ConsumerWidget {
                 itemBuilder: (context, i) {
                   final n = items[i];
                   return ListTile(
-                    leading: Icon(
-                      n.isRead
-                          ? Icons.notifications_none
-                          : Icons.notifications_active,
-                      color: n.isRead
-                          ? Colors.grey
-                          : Theme.of(context).colorScheme.primary,
+                    leading: Container(
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: n.isRead
+                            ? softBg
+                            : const Color(0xFFFFEDE4),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        n.isRead
+                            ? Icons.notifications_none
+                            : Icons.notifications_active,
+                        size: 20,
+                        color: n.isRead
+                            ? const Color(0xFFB9B1A8)
+                            : const Color(0xFFC24A1D),
+                      ),
                     ),
                     title: Text(n.title,
                         style: TextStyle(
+                            fontSize: 14,
                             fontWeight:
-                                n.isRead ? null : FontWeight.bold)),
-                    subtitle: Text('${n.body}\n${formatDateTime(n.createdAt)}'),
+                                n.isRead ? FontWeight.w500 : FontWeight.w800)),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(n.body,
+                              style: const TextStyle(
+                                  fontSize: 13, color: mutedText)),
+                          const SizedBox(height: 2),
+                          Text(formatDateTime(n.createdAt),
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFFB9B1A8))),
+                        ],
+                      ),
+                    ),
                     isThreeLine: true,
                     onTap: () => _open(context, ref, n),
                   );

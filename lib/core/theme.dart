@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 /// 포인트는 브랜드 오렌지 하나만 쓴다.
 const brandOrange = Color(0xFFFF6B35);
 
+/// 시안 C 공용 색 토큰
+const inkText = Color(0xFF1F1A15);
+const mutedText = Color(0xFF857C72);
+const lineColor = Color(0xFFF0EBE4);
+const softBg = Color(0xFFF6F2ED);
+
 /// 온이미지 카드의 하단 스크림 (흰 사진 위 흰 글자 가독성 확보)
 const imageScrim = LinearGradient(
   begin: Alignment.bottomCenter,

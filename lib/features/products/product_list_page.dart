@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +15,7 @@ import 'categories.dart';
 import 'product.dart';
 import 'products_providers.dart';
 import 'widgets/countdown_badge.dart';
+import 'widgets/product_card.dart';
 
 /// 목록 정렬 기준
 enum _Sort {
@@ -265,7 +265,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                                 childAspectRatio: 0.78,
                               ),
                               delegate: SliverChildBuilderDelegate(
-                                (context, i) => _ProductCard(
+                                (context, i) => ProductCard(
                                   product: filtered[i],
                                   stats: reviewStats[filtered[i].id],
                                   wished: wishedIds.contains(filtered[i].id),
@@ -405,7 +405,7 @@ class _HeroCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _ProductImage(product: product),
+          ProductImage(product: product),
           const DecoratedBox(
               decoration: BoxDecoration(gradient: imageScrim)),
           // ⚡ 타임세일 배지
@@ -496,160 +496,6 @@ class _HeroCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 상품 카드 — 시안 C: 정보가 사진 위로 (하단 스크림 + 온이미지 텍스트)
-class _ProductCard extends StatelessWidget {
-  const _ProductCard({
-    required this.product,
-    this.stats,
-    this.wished = false,
-    this.onWishToggle,
-  });
-
-  final Product product;
-  final ReviewStats? stats;
-  final bool wished;
-  final ValueChanged<bool>? onWishToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final pct = product.isOnTimeSale
-        ? product.saleDiscountRate
-        : product.discountRate;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _ProductImage(product: product),
-          const DecoratedBox(
-              decoration: BoxDecoration(gradient: imageScrim)),
-          Positioned(
-            top: 8,
-            left: 8,
-            child: CountdownBadge(
-                endsAt: product.endsAt, compact: true, onImage: true),
-          ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 9,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  product.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.88),
-                    fontSize: 10.5,
-                  ),
-                ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    if (pct != null) ...[
-                      Text(
-                        '$pct%',
-                        style: const TextStyle(
-                          color: Color(0xFFFFB08A),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                    ],
-                    Flexible(
-                      child: Text(
-                        formatWon(product.effectivePrice),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (stats != null && stats!.reviewCount > 0)
-                  Row(
-                    children: [
-                      const Icon(Icons.star_rounded,
-                          size: 11, color: Color(0xFFFFC94D)),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${stats!.avgLabel} (${stats!.reviewCount})',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 9.5,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => context.push('/product/${product.id}'),
-            ),
-          ),
-          // 하트는 잉크웰 위에 — 카드 탭과 분리
-          Positioned(
-            top: 6,
-            right: 6,
-            child: Material(
-              color: Colors.white.withValues(alpha: 0.85),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => onWishToggle?.call(!wished),
-                child: Padding(
-                  padding: const EdgeInsets.all(5),
-                  child: Icon(
-                    wished ? Icons.favorite : Icons.favorite_border,
-                    size: 15,
-                    color: wished ? Colors.red : const Color(0xFF6E675F),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 상품 대표 이미지 (없으면 회색 자리표시)
-class _ProductImage extends StatelessWidget {
-  const _ProductImage({required this.product});
-
-  final Product product;
-
-  @override
-  Widget build(BuildContext context) {
-    if (product.imageUrls.isEmpty) {
-      return Container(
-        color: const Color(0xFFF6F2ED),
-        child: const Icon(Icons.image_outlined,
-            size: 40, color: Color(0xFFB9B1A8)),
-      );
-    }
-    return CachedNetworkImage(
-      imageUrl: product.imageUrls.first,
-      fit: BoxFit.cover,
-      errorWidget: (_, _, _) => const Icon(Icons.broken_image_outlined),
     );
   }
 }

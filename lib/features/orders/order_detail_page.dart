@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/env.dart';
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../core/formatters.dart';
 import '../reviews/review_form_dialog.dart';
 import '../reviews/reviews_providers.dart';
@@ -164,23 +166,26 @@ class _OrderDetail extends ConsumerWidget {
           padding: const EdgeInsets.all(20),
           children: [
             if (justPlaced)
-              Card(
-                color: theme.colorScheme.primaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle_outline),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          order.paymentMethod == 'bank_transfer'
-                              ? '주문이 접수되었습니다.\n24시간 내에 아래 계좌로 입금해 주세요. 미입금 시 주문이 자동 취소됩니다.\n${Env.bankAccountInfo}'
-                              : '주문이 접수되었습니다.',
-                        ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3EC),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline,
+                        color: Color(0xFFC24A1D)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        order.paymentMethod == 'bank_transfer'
+                            ? '주문이 접수되었습니다.\n24시간 내에 아래 계좌로 입금해 주세요. 미입금 시 주문이 자동 취소됩니다.\n${Env.bankAccountInfo}'
+                            : '주문이 접수되었습니다.',
+                        style: const TextStyle(height: 1.5),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             const SizedBox(height: 12),
@@ -189,7 +194,16 @@ class _OrderDetail extends ConsumerWidget {
               children: [
                 _row('주문번호', order.orderNumber),
                 _row('주문일시', formatDateTime(order.createdAt)),
-                _row('상태', order.statusLabel),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      const Expanded(child: Text('상태')),
+                      StatusPill(
+                          label: order.statusLabel, status: order.status),
+                    ],
+                  ),
+                ),
                 _row('결제수단', order.paymentMethodLabel),
                 if (order.paymentMethod == 'bank_transfer') ...[
                   _row('입금자명', order.depositorName ?? '-'),
@@ -343,17 +357,18 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            ...children,
-          ],
-        ),
+    return SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: mutedText)),
+          const SizedBox(height: 10),
+          ...children,
+        ],
       ),
     );
   }

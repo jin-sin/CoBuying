@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import 'orders_providers.dart';
 
 class OrderListPage extends ConsumerWidget {
@@ -30,48 +32,67 @@ class OrderListPage extends ConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('주문 내역을 불러오지 못했습니다.\n$e')),
           data: (items) => items.isEmpty
-              ? ListView(
-                  children: const [
-                    SizedBox(height: 160),
-                    Icon(Icons.receipt_long_outlined,
-                        size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Center(child: Text('주문 내역이 없습니다.')),
-                  ],
+              ? const EmptyState(
+                  icon: Icons.receipt_long_outlined,
+                  message: '주문 내역이 없습니다.',
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final order = items[i];
-                    final summary = order.items.isEmpty
-                        ? ''
-                        : order.items.length == 1
-                            ? order.items.first.productTitle
-                            : '${order.items.first.productTitle} 외 ${order.items.length - 1}건';
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        title: Text(summary),
-                        subtitle: Text(
-                            '${order.orderNumber} · ${formatDateTime(order.createdAt)}'),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(formatWon(order.totalAmount),
-                                style:
-                                    const TextStyle(fontWeight: FontWeight.bold)),
-                            Text(order.statusLabel,
-                                style: TextStyle(
-                                    color:
-                                        Theme.of(context).colorScheme.primary)),
-                          ],
-                        ),
-                        onTap: () => context.push('/orders/${order.id}'),
-                      ),
-                    );
-                  },
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: items.length,
+                      itemBuilder: (context, i) {
+                        final order = items[i];
+                        final summary = order.items.isEmpty
+                            ? ''
+                            : order.items.length == 1
+                                ? order.items.first.productTitle
+                                : '${order.items.first.productTitle} 외 ${order.items.length - 1}건';
+                        return SoftCard(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          onTap: () => context.push('/orders/${order.id}'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  StatusPill(
+                                      label: order.statusLabel,
+                                      status: order.status),
+                                  const Spacer(),
+                                  Text(formatDateTime(order.createdAt),
+                                      style: const TextStyle(
+                                          fontSize: 11.5, color: mutedText)),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(summary,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(order.orderNumber,
+                                      style: const TextStyle(
+                                          fontSize: 11.5, color: mutedText)),
+                                  const Spacer(),
+                                  Text(formatWon(order.totalAmount),
+                                      style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
         ),
       ),

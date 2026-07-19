@@ -1,9 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import 'cart_item.dart';
 import 'cart_providers.dart';
 
@@ -22,21 +23,11 @@ class CartPage extends ConsumerWidget {
         error: (e, _) => Center(child: Text('장바구니를 불러오지 못했습니다.\n$e')),
         data: (items) {
           if (items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.shopping_cart_outlined,
-                      size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text('장바구니가 비어 있습니다.'),
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () => context.go('/'),
-                    child: const Text('상품 보러가기'),
-                  ),
-                ],
-              ),
+            return EmptyState(
+              icon: Icons.shopping_cart_outlined,
+              message: '장바구니가 비어 있습니다.',
+              actionLabel: '상품 보러가기',
+              onAction: () => context.go('/'),
             );
           }
 
@@ -63,7 +54,11 @@ class CartPage extends ConsumerWidget {
                 ),
               ),
               SafeArea(
-                child: Padding(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: lineColor)),
+                  ),
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -71,7 +66,8 @@ class CartPage extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('총 결제금액'),
+                          const Text('총 결제금액',
+                              style: TextStyle(color: mutedText)),
                           Text(formatWon(total),
                               style: Theme.of(context)
                                   .textTheme
@@ -108,27 +104,15 @@ class _CartTile extends ConsumerWidget {
     final product = item.product;
     final notifier = ref.read(cartProvider.notifier);
 
-    return Card(
+    return SoftCard(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+      padding: const EdgeInsets.all(12),
+      child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 72,
-                height: 72,
-                child: (product == null || product.imageUrls.isEmpty)
-                    ? Container(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        child: const Icon(Icons.image_outlined),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: product.imageUrls.first, fit: BoxFit.cover),
-              ),
+            ProductThumb(
+              imageUrl: (product == null || product.imageUrls.isEmpty)
+                  ? null
+                  : product.imageUrls.first,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -136,14 +120,18 @@ class _CartTile extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(product?.title ?? '(삭제된 상품)',
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
                   if (item.optionsLabel.isNotEmpty)
                     Text(item.optionsLabel,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600])),
+                        style: const TextStyle(
+                            fontSize: 12, color: mutedText)),
                   const SizedBox(height: 4),
                   Text(formatWon(item.lineTotal),
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -170,13 +158,12 @@ class _CartTile extends ConsumerWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.close),
+              icon: const Icon(Icons.close, size: 20, color: mutedText),
               tooltip: '삭제',
               onPressed: () => notifier.remove(item.id),
             ),
           ],
         ),
-      ),
     );
   }
 }
