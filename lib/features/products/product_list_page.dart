@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
 import '../auth/auth_providers.dart';
 import '../cart/cart_providers.dart';
-import '../notifications/notifications_providers.dart';
 import '../notifications/push/push_providers.dart';
 import '../reviews/review.dart';
 import '../reviews/reviews_providers.dart';
@@ -28,6 +28,18 @@ enum _Sort {
   final String label;
 }
 
+/// 카테고리 아이콘 (시안 C — 텍스트 탭 대신 아이콘 칩)
+const _categoryIcons = <String, IconData>{
+  '식품': Icons.lunch_dining_outlined,
+  '패션·잡화': Icons.checkroom,
+  '뷰티': Icons.auto_awesome_outlined,
+  '리빙·주방': Icons.chair_outlined,
+  '디지털·가전': Icons.devices_outlined,
+  '키즈': Icons.toys_outlined,
+  '반려동물': Icons.pets_outlined,
+  '기타': Icons.more_horiz,
+};
+
 class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
 
@@ -40,6 +52,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   String _query = '';
   String? _category; // null = 전체
   _Sort _sort = _Sort.endingSoon;
+  bool _searchOpen = false;
 
   @override
   void dispose() {
@@ -100,9 +113,20 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('공동구매'),
+        titleSpacing: 16,
+        title: const _WordMark(),
         actions: [
-          if (user != null) const _NotificationBell(),
+          IconButton(
+            tooltip: '검색',
+            icon: Icon(_searchOpen ? Icons.close : Icons.search),
+            onPressed: () => setState(() {
+              _searchOpen = !_searchOpen;
+              if (!_searchOpen) {
+                _search.clear();
+                _query = '';
+              }
+            }),
+          ),
           Badge(
             isLabelVisible: cartCount > 0,
             label: Text('$cartCount'),
@@ -125,66 +149,58 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _search,
-                    decoration: InputDecoration(
-                      hintText: '상품·판매자 검색',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _search.clear();
-                                setState(() => _query = '');
-                              },
-                            ),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+          if (_searchOpen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _search,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: '상품·판매자 검색',
+                        prefixIcon: const Icon(Icons.search),
+                        isDense: true,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onChanged: (v) => setState(() => _query = v),
                     ),
-                    onChanged: (v) => setState(() => _query = v),
                   ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<_Sort>(
-                  value: _sort,
-                  underline: const SizedBox.shrink(),
-                  items: [
-                    for (final s in _Sort.values)
-                      DropdownMenuItem(value: s, child: Text(s.label)),
-                  ],
-                  onChanged: (s) =>
-                      setState(() => _sort = s ?? _Sort.endingSoon),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  DropdownButton<_Sort>(
+                    value: _sort,
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (final s in _Sort.values)
+                        DropdownMenuItem(value: s, child: Text(s.label)),
+                    ],
+                    onChanged: (s) =>
+                        setState(() => _sort = s ?? _Sort.endingSoon),
+                  ),
+                ],
+              ),
             ),
-          ),
           SizedBox(
-            height: 48,
+            height: 76,
             width: double.infinity,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              // Material Chip은 가로 무제한 레이아웃에서 최소 intrinsic 폭
-              // (한글은 글자 단위 줄바꿈 가능 → 1글자)으로 접혀 라벨이 잘리므로
-              // 커스텀 알약 버튼을 쓴다.
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
                 children: [
-                  _CategoryPill(
+                  _CategoryChip(
                     label: '전체',
+                    icon: Icons.grid_view_rounded,
                     selected: _category == null,
                     onTap: () => setState(() => _category = null),
                   ),
                   for (final c in productCategories) ...[
-                    const SizedBox(width: 8),
-                    _CategoryPill(
+                    const SizedBox(width: 14),
+                    _CategoryChip(
                       label: c,
+                      icon: _categoryIcons[c] ?? Icons.category_outlined,
                       selected: _category == c,
                       onTap: () => setState(
                           () => _category = _category == c ? null : c),
@@ -218,29 +234,51 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                       Center(child: Text('조건에 맞는 상품이 없습니다.')),
                     ]);
                   }
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final columns =
-                          (constraints.maxWidth / 320).floor().clamp(1, 4);
-                      return GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.72,
-                        ),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) => _ProductCard(
-                          product: filtered[i],
-                          stats: reviewStats[filtered[i].id],
-                          wished: wishedIds.contains(filtered[i].id),
-                          onWishToggle: (wished) =>
-                              _toggleWish(filtered[i], wished),
-                        ),
-                      );
-                    },
+                  // 검색·카테고리 필터가 없을 때만 타임세일 히어로 노출
+                  final saleItems = _query.trim().isEmpty && _category == null
+                      ? filtered.where((p) => p.isOnTimeSale).toList()
+                      : const <Product>[];
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1080),
+                      child: CustomScrollView(
+                        slivers: [
+                          if (saleItems.isNotEmpty)
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                              sliver: SliverToBoxAdapter(
+                                child: _SaleHero(
+                                  products: saleItems,
+                                  wishedIds: wishedIds,
+                                ),
+                              ),
+                            ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverGrid(
+                              gridDelegate:
+                                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 250,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio: 0.78,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, i) => _ProductCard(
+                                  product: filtered[i],
+                                  stats: reviewStats[filtered[i].id],
+                                  wished: wishedIds.contains(filtered[i].id),
+                                  onWishToggle: (wished) =>
+                                      _toggleWish(filtered[i], wished),
+                                ),
+                                childCount: filtered.length,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
@@ -252,62 +290,366 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   }
 }
 
-/// 알림 종 아이콘 + 안읽음 배지 (Realtime 스트림으로 실시간 갱신)
-class _NotificationBell extends ConsumerWidget {
-  const _NotificationBell();
+/// 브랜드 워드마크 — "공동구매"에서 '구매'만 오렌지
+class _WordMark extends StatelessWidget {
+  const _WordMark();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(unreadNotificationCountProvider);
-    return Badge(
-      isLabelVisible: unread > 0,
-      label: Text('$unread'),
-      offset: const Offset(-6, 6),
-      child: IconButton(
-        tooltip: '알림',
-        icon: const Icon(Icons.notifications_outlined),
-        onPressed: () => context.push('/notifications'),
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.5,
+          color: Color(0xFF1F1A15),
+        ),
+        children: [
+          const TextSpan(text: '공동'),
+          TextSpan(text: '구매', style: TextStyle(color: brandOrange)),
+        ],
       ),
     );
   }
 }
 
-/// 카테고리 선택 알약 버튼 (가로 스크롤용 Chip 대체)
-class _CategoryPill extends StatelessWidget {
-  const _CategoryPill({
+/// 카테고리 아이콘 칩 (시안 C)
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
     required this.label,
+    required this.icon,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
+  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: selected ? scheme.primaryContainer : Colors.transparent,
-      shape: StadiumBorder(
-        side: BorderSide(
-            color: selected ? Colors.transparent : scheme.outlineVariant),
-      ),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
+    const orangeInk = Color(0xFFC24A1D);
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: selected ? const Color(0xFFFFEDE4) : const Color(0xFFF6F2ED),
+              borderRadius: BorderRadius.circular(16),
+              border: selected
+                  ? Border.all(color: brandOrange, width: 1.5)
+                  : null,
+            ),
+            child: Icon(icon,
+                size: 21,
+                color: selected ? orangeInk : const Color(0xFF6E675F)),
+          ),
+          const SizedBox(height: 3),
+          Text(
             label,
-            softWrap: false,
             style: TextStyle(
-              color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
-              fontWeight: selected ? FontWeight.bold : null,
+              fontSize: 10,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? orangeInk : const Color(0xFF6E675F),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 타임세일 히어로 — 진행 중 세일 상품을 홈 최상단 대형 카드로.
+/// 여러 개면 가로 스와이프.
+class _SaleHero extends StatelessWidget {
+  const _SaleHero({required this.products, required this.wishedIds});
+
+  final List<Product> products;
+  final Set<String> wishedIds;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.length == 1) {
+      return SizedBox(height: 195, child: _HeroCard(product: products.first));
+    }
+    return SizedBox(
+      height: 195,
+      child: PageView.builder(
+        controller: PageController(viewportFraction: 0.93),
+        itemCount: products.length,
+        padEnds: false,
+        itemBuilder: (context, i) => Padding(
+          padding: EdgeInsets.only(right: i == products.length - 1 ? 0 : 10),
+          child: _HeroCard(product: products[i]),
         ),
       ),
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _ProductImage(product: product),
+          const DecoratedBox(
+              decoration: BoxDecoration(gradient: imageScrim)),
+          // ⚡ 타임세일 배지
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: brandOrange,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.bolt, size: 13, color: Colors.white),
+                  Text(
+                    '타임세일 ${product.saleDiscountRate}%',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 12,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        product.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.88),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            formatWon(product.effectivePrice),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            formatWon(product.price),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 12,
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor:
+                                  Colors.white.withValues(alpha: 0.65),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (product.saleEndsAt != null)
+                  CountdownBadge(endsAt: product.saleEndsAt!, onImage: true),
+              ],
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.push('/product/${product.id}'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 상품 카드 — 시안 C: 정보가 사진 위로 (하단 스크림 + 온이미지 텍스트)
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({
+    required this.product,
+    this.stats,
+    this.wished = false,
+    this.onWishToggle,
+  });
+
+  final Product product;
+  final ReviewStats? stats;
+  final bool wished;
+  final ValueChanged<bool>? onWishToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = product.isOnTimeSale
+        ? product.saleDiscountRate
+        : product.discountRate;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _ProductImage(product: product),
+          const DecoratedBox(
+              decoration: BoxDecoration(gradient: imageScrim)),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: CountdownBadge(
+                endsAt: product.endsAt, compact: true, onImage: true),
+          ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 9,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  product.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    fontSize: 10.5,
+                  ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    if (pct != null) ...[
+                      Text(
+                        '$pct%',
+                        style: const TextStyle(
+                          color: Color(0xFFFFB08A),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Flexible(
+                      child: Text(
+                        formatWon(product.effectivePrice),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (stats != null && stats!.reviewCount > 0)
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded,
+                          size: 11, color: Color(0xFFFFC94D)),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${stats!.avgLabel} (${stats!.reviewCount})',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 9.5,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.push('/product/${product.id}'),
+            ),
+          ),
+          // 하트는 잉크웰 위에 — 카드 탭과 분리
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.85),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => onWishToggle?.call(!wished),
+                child: Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Icon(
+                    wished ? Icons.favorite : Icons.favorite_border,
+                    size: 15,
+                    color: wished ? Colors.red : const Color(0xFF6E675F),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 상품 대표 이미지 (없으면 회색 자리표시)
+class _ProductImage extends StatelessWidget {
+  const _ProductImage({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    if (product.imageUrls.isEmpty) {
+      return Container(
+        color: const Color(0xFFF6F2ED),
+        child: const Icon(Icons.image_outlined,
+            size: 40, color: Color(0xFFB9B1A8)),
+      );
+    }
+    return CachedNetworkImage(
+      imageUrl: product.imageUrls.first,
+      fit: BoxFit.cover,
+      errorWidget: (_, _, _) => const Icon(Icons.broken_image_outlined),
     );
   }
 }
@@ -328,10 +670,6 @@ class _ProfileMenu extends ConsumerWidget {
       icon: const Icon(Icons.person_outline),
       onSelected: (value) {
         switch (value) {
-          case 'orders':
-            context.push('/orders');
-          case 'wishlist':
-            context.push('/wishlist');
           case 'seller':
             context.push('/seller');
           case 'admin':
@@ -345,20 +683,6 @@ class _ProfileMenu extends ConsumerWidget {
         }
       },
       itemBuilder: (_) => [
-        const PopupMenuItem(
-          value: 'orders',
-          child: ListTile(
-            leading: Icon(Icons.receipt_long_outlined),
-            title: Text('주문 내역'),
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'wishlist',
-          child: ListTile(
-            leading: Icon(Icons.favorite_border),
-            title: Text('찜한 상품'),
-          ),
-        ),
         PopupMenuItem(
           value: 'seller',
           child: ListTile(
@@ -383,117 +707,6 @@ class _ProfileMenu extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  const _ProductCard({
-    required this.product,
-    this.stats,
-    this.wished = false,
-    this.onWishToggle,
-  });
-
-  final Product product;
-  final ReviewStats? stats;
-  final bool wished;
-  final ValueChanged<bool>? onWishToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/product/${product.id}'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  product.imageUrls.isEmpty
-                      ? Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: const Icon(Icons.image_outlined, size: 48),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: product.imageUrls.first,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, _, _) =>
-                              const Icon(Icons.broken_image_outlined),
-                        ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: IconButton(
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black26,
-                      ),
-                      icon: Icon(
-                        wished ? Icons.favorite : Icons.favorite_border,
-                        color: wished ? Colors.red : Colors.white,
-                      ),
-                      tooltip: wished ? '찜 해제' : '찜하기',
-                      onPressed: () => onWishToggle?.call(!wished),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(product.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (product.isOnTimeSale) ...[
-                        const Icon(Icons.bolt, size: 18, color: Colors.red),
-                        Text('${product.saleDiscountRate}%',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.red, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 6),
-                      ] else if (product.discountRate != null) ...[
-                        Text('${product.discountRate}%',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.red, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 6),
-                      ],
-                      Text(formatWon(product.effectivePrice),
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      CountdownBadge(endsAt: product.endsAt, compact: true),
-                      const Spacer(),
-                      if (stats != null && stats!.reviewCount > 0) ...[
-                        const Icon(Icons.star, size: 14, color: Colors.amber),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${stats!.avgLabel} (${stats!.reviewCount})',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

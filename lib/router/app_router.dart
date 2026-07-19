@@ -18,6 +18,7 @@ import '../features/products/product_detail_page.dart';
 import '../features/products/product_list_page.dart';
 import '../features/seller/seller_home_page.dart';
 import '../features/wishlist/wishlist_page.dart';
+import 'app_shell.dart';
 
 /// 로그인이 필요한 경로
 const _authRequired = {
@@ -46,7 +47,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/', builder: (_, _) => const ProductListPage()),
+      // 하단 네비게이션 탭 4개 (홈/찜/알림/주문) — 시안 C
+      ShellRoute(
+        builder: (_, _, child) => AppShell(child: child),
+        routes: [
+          GoRoute(path: '/', builder: (_, _) => const ProductListPage()),
+          GoRoute(
+              path: '/wishlist', builder: (_, _) => const WishlistPage()),
+          GoRoute(
+              path: '/notifications',
+              builder: (_, _) => const NotificationsPage()),
+          GoRoute(path: '/orders', builder: (_, _) => const OrderListPage()),
+        ],
+      ),
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
       GoRoute(
         path: '/product/:id',
@@ -54,9 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ProductDetailPage(productId: state.pathParameters['id']!),
       ),
       GoRoute(path: '/cart', builder: (_, _) => const CartPage()),
-      GoRoute(path: '/wishlist', builder: (_, _) => const WishlistPage()),
       GoRoute(path: '/checkout', builder: (_, _) => const CheckoutPage()),
-      GoRoute(path: '/orders', builder: (_, _) => const OrderListPage()),
       GoRoute(
         path: '/orders/:id',
         builder: (_, state) => OrderDetailPage(
@@ -82,9 +93,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           ...state.uri.queryParameters,
         }),
       ),
-      GoRoute(
-          path: '/notifications',
-          builder: (_, _) => const NotificationsPage()),
       GoRoute(path: '/seller', builder: (_, _) => const SellerHomePage()),
       GoRoute(
           path: '/seller/product/new',
