@@ -30,8 +30,13 @@ class Env {
   );
 
   /// 웹 푸시(FCM) VAPID 공개 키 — Firebase 콘솔 > 클라우드 메시징 >
-  /// 웹 푸시 인증서. 비어 있으면 웹에서는 푸시를 켜지 않는다 (앱은 무관).
-  static const fcmVapidKey = String.fromEnvironment('FCM_VAPID_KEY');
+  /// 웹 푸시 인증서 (공개 키라 내장 가능). 비어 있으면 웹에서는 푸시를
+  /// 켜지 않는다 (앱은 무관).
+  static const fcmVapidKey = String.fromEnvironment(
+    'FCM_VAPID_KEY',
+    defaultValue:
+        'BHjgqHxb4TIbTcoeQ96RKj7yIxykfOrmoeGtX6JHF146AOcX_vnfiujX2YeA84gIaaz1cScGezIzO2fTRhx_7f0',
+  );
 
   /// 토스페이먼츠 클라이언트 키 (기본값은 공개 문서용 테스트 키).
   /// 운영 전환 시 --dart-define=TOSS_CLIENT_KEY=live_ck_... 로 교체.
