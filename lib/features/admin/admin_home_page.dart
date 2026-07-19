@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/formatters.dart';
 import '../maintenance/maintenance.dart';
 import '../maintenance/maintenance_providers.dart';
+import '../orders/order.dart';
 import '../orders/orders_providers.dart';
 import '../products/products_providers.dart';
 import '../seller/seller_profile.dart';
@@ -264,12 +265,16 @@ class _AdminOrdersTab extends ConsumerWidget {
   }
 
   Future<void> _cancelOrder(
-      BuildContext context, WidgetRef ref, String orderId) async {
+      BuildContext context, WidgetRef ref, Order order) async {
+    final isCardPaid =
+        order.paymentMethod == 'card' && order.status != 'pending_payment';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('주문 취소'),
-        content: const Text('이 주문을 취소할까요?\n상품 재고는 자동으로 복원됩니다.'),
+        content: Text(isCardPaid
+            ? '이 주문을 취소할까요?\n카드 결제 금액은 토스페이먼츠로 자동 환불되고, 상품 재고는 복원됩니다.'
+            : '이 주문을 취소할까요?\n상품 재고는 자동으로 복원됩니다.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -281,8 +286,20 @@ class _AdminOrdersTab extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    if (context.mounted) {
-      await _updateStatus(context, ref, orderId, 'cancelled');
+    if (!context.mounted) return;
+    try {
+      await ref.read(ordersRepositoryProvider).adminCancelOrder(order.id);
+      ref.invalidate(allOrdersProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                isCardPaid ? '주문을 취소하고 결제를 환불했습니다.' : '주문을 취소했습니다.')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('취소에 실패했습니다: $e')));
+      }
     }
   }
 
@@ -359,7 +376,7 @@ class _AdminOrdersTab extends ConsumerWidget {
                                     foregroundColor:
                                         Theme.of(context).colorScheme.error),
                                 onPressed: () =>
-                                    _cancelOrder(context, ref, o.id),
+                                    _cancelOrder(context, ref, o),
                                 child: const Text('주문 취소'),
                               ),
                           ],

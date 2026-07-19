@@ -110,6 +110,11 @@ class OrdersRepository {
     });
   }
 
+  /// 관리자용: 주문 취소 — 카드 결제분은 서버(RPC)가 토스 환불까지 처리
+  Future<void> adminCancelOrder(String orderId) async {
+    await _client.rpc('admin_cancel_order', params: {'p_order_id': orderId});
+  }
+
   /// 관리자용: 주문 상태 변경 (입금 확인 등)
   Future<void> updateStatus(String orderId, String status) async {
     await _client

@@ -61,11 +61,14 @@ class _OrderDetail extends ConsumerWidget {
   final bool justPlaced;
 
   Future<void> _cancelOrder(BuildContext context, WidgetRef ref) async {
+    final isCardPaid = order.status == 'paid' && order.paymentMethod == 'card';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('주문 취소'),
-        content: const Text('이 주문을 취소할까요?\n취소한 주문은 되돌릴 수 없습니다.'),
+        content: Text(isCardPaid
+            ? '이 주문을 취소할까요?\n결제 금액은 카드사 절차에 따라 3~5영업일 내 환불됩니다.'
+            : '이 주문을 취소할까요?\n취소한 주문은 되돌릴 수 없습니다.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -299,7 +302,9 @@ class _OrderDetail extends ConsumerWidget {
                 style: theme.textTheme.bodySmall,
               ),
             ],
-            if (order.status == 'pending_payment') ...[
+            // 결제 전, 또는 카드 결제 완료(셀러 배송 준비 시작 전)까지 취소 가능
+            if (order.status == 'pending_payment' ||
+                (order.status == 'paid' && order.paymentMethod == 'card')) ...[
               SizedBox(height: justPlaced ? 8 : 24),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(

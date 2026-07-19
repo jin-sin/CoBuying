@@ -1024,7 +1024,12 @@ begin
       (new.user_id, '주문이 취소되었습니다',
        case when old.status = 'pending_payment'
             then '주문 ' || new.order_number || '이(가) 취소되었습니다. 미입금 주문은 기한이 지나면 자동 취소됩니다.'
-            else '주문 ' || new.order_number || '이(가) 취소되었습니다.' end,
+            else '주문 ' || new.order_number || '이(가) 취소되었습니다.' end
+       -- 카드 환불이 실행된 취소면 환불 안내 덧붙임 (26절)
+       || case when exists (select 1 from public.payments
+                            where order_id = new.id and cancelled_at is not null)
+               then ' 결제 금액은 카드사 절차에 따라 3~5영업일 내 환불됩니다.'
+               else '' end,
        '/orders/' || new.id);
     -- 결제 이후 취소는 셀러에게도 알림
     if old.status <> 'pending_payment' then
@@ -1718,3 +1723,161 @@ select cron.schedule(
   '* * * * *',
   $$ select public.send_push_notifications() $$
 );
+
+-- ------------------------------------------------------------
+-- 26. 카드결제 환불
+--     취소 시 토스 결제취소 API를 DB(http 확장)가 호출해 환불한다
+--     (승인과 동일 패턴 — 15절). 환불 없이 카드 주문이 취소되는
+--     경로는 가드 트리거가 차단한다.
+--     구매자 = paid(셀러 준비 시작 전)까지 셀프 취소·자동 환불,
+--     관리자 = admin_cancel_order로 배송 시작 전까지 취소·환불.
+-- ------------------------------------------------------------
+alter table public.payments add column if not exists cancelled_at timestamptz;
+
+-- 내부 헬퍼: 승인된 카드 결제가 있으면 토스에 취소 요청하고 payments에 기록.
+-- 결제 기록이 없거나(결제 전 취소) 이미 환불됐으면 조용히 통과 — 멱등.
+create or replace function public.refund_card_payment(p_order_id uuid, p_reason text)
+returns void
+language plpgsql
+security definer set search_path = public, extensions
+as $fn$
+declare
+  v_pay    public.payments%rowtype;
+  v_secret text;
+  v_cred   text;
+  v_resp   http_response;
+  v_json   jsonb;
+begin
+  select * into v_pay from public.payments where order_id = p_order_id for update;
+  if not found or v_pay.cancelled_at is not null then
+    return;
+  end if;
+
+  select value into v_secret from private.app_secrets where key = 'toss_secret_key';
+  if v_secret is null then
+    raise exception '결제 설정이 없습니다. 관리자에게 문의하세요.';
+  end if;
+  v_cred := replace(encode(convert_to(v_secret || ':', 'utf8'), 'base64'), E'\n', '');
+
+  perform http_set_curlopt('CURLOPT_TIMEOUT', '10');
+
+  v_resp := http((
+    'POST',
+    'https://api.tosspayments.com/v1/payments/' || v_pay.payment_key || '/cancel',
+    array[http_header('Authorization', 'Basic ' || v_cred)],
+    'application/json',
+    jsonb_build_object('cancelReason', p_reason)::text
+  )::http_request);
+
+  v_json := v_resp.content::jsonb;
+
+  -- 이전 시도에서 토스 취소만 되고 DB 반영 전에 끊긴 재시도는 성공 처리
+  if v_resp.status <> 200
+     and coalesce(v_json ->> 'code', '') <> 'ALREADY_CANCELED_PAYMENT' then
+    raise exception '결제 환불에 실패했습니다: %',
+      coalesce(v_json ->> 'message', 'HTTP ' || v_resp.status::text);
+  end if;
+
+  update public.payments
+  set status = 'CANCELED',
+      cancelled_at = now(),
+      raw = raw || jsonb_build_object('cancel', v_json)
+  where id = v_pay.id;
+end;
+$fn$;
+
+-- 취소 RPC 내부에서만 호출 (클라이언트 직접 호출 차단)
+revoke execute on function public.refund_card_payment(uuid, text)
+  from public, anon, authenticated;
+
+-- 가드: 결제가 잡힌 카드 주문을 환불 없이 취소하는 모든 경로 차단.
+-- (취소 RPC는 환불을 먼저 처리해 cancelled_at을 채운 뒤 상태를 바꾼다)
+create or replace function public.block_unrefunded_card_cancel()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if exists (select 1 from public.payments
+             where order_id = new.id and cancelled_at is null) then
+    raise exception '카드 결제된 주문은 환불 처리(취소 버튼)로만 취소할 수 있습니다.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_block_unrefunded_card_cancel on public.orders;
+create trigger trg_block_unrefunded_card_cancel
+  before update of status on public.orders
+  for each row
+  when (new.status = 'cancelled' and old.status <> 'cancelled')
+  execute function public.block_unrefunded_card_cancel();
+
+-- 구매자 취소 확장: 입금 대기 외에 카드 결제 완료(paid) 상태도 허용.
+-- 셀러가 배송 준비를 시작하면(order 상태가 preparing 이후) 관리자 문의로 안내.
+create or replace function public.cancel_my_order(p_order_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_order public.orders%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+
+  select * into v_order
+  from public.orders
+  where id = p_order_id and user_id = auth.uid()
+  for update;
+
+  if not found then
+    raise exception '주문을 찾을 수 없습니다.';
+  end if;
+
+  if v_order.status = 'pending_payment' then
+    null; -- 결제 전 — 바로 취소
+  elsif v_order.status = 'paid' and v_order.payment_method = 'card' then
+    perform public.refund_card_payment(p_order_id, '구매자 주문 취소');
+  else
+    raise exception '이 상태에서는 직접 취소할 수 없습니다. 관리자에게 문의해 주세요.';
+  end if;
+
+  update public.orders
+  set status = 'cancelled', updated_at = now()
+  where id = p_order_id;
+end;
+$$;
+
+-- 관리자 취소: 배송 시작 전까지, 카드 결제분은 자동 환불
+create or replace function public.admin_cancel_order(p_order_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_order public.orders%rowtype;
+begin
+  if not public.is_admin() then
+    raise exception '관리자만 사용할 수 있습니다.';
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception '주문을 찾을 수 없습니다.';
+  end if;
+  if v_order.status = 'cancelled' then
+    return; -- 이미 취소됨 — 멱등
+  end if;
+  if v_order.status not in ('pending_payment', 'paid', 'preparing') then
+    raise exception '배송이 시작된 주문은 취소할 수 없습니다.';
+  end if;
+
+  perform public.refund_card_payment(p_order_id, '관리자 주문 취소');
+
+  update public.orders
+  set status = 'cancelled', updated_at = now()
+  where id = p_order_id;
+end;
+$$;
