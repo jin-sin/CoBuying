@@ -285,11 +285,13 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                   ],
                                 ),
                               ),
-                            const RadioListTile<String>(
-                              value: 'card',
-                              title: Text('카드결제'),
-                              subtitle: Text('토스페이먼츠 결제창으로 결제합니다'),
-                            ),
+                            // 카드결제는 토스 정식 계약 전까지 숨김 (Env.cardPaymentEnabled)
+                            if (Env.cardPaymentEnabled)
+                              const RadioListTile<String>(
+                                value: 'card',
+                                title: Text('카드결제'),
+                                subtitle: Text('토스페이먼츠 결제창으로 결제합니다'),
+                              ),
                           ],
                         ),
                       ),

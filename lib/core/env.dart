@@ -23,6 +23,12 @@ class Env {
   /// 무통장입금 안내 계좌 (플랫폼 수취 계좌)
   static const bankAccountInfo = '국민은행 91102204374 (예금주: 신규리)';
 
+  /// 카드결제(토스페이먼츠) 노출 여부.
+  /// 토스 정식 계약(라이브 키) 전까지는 무통장입금만 운영하므로 false로 숨긴다.
+  /// 계약 후 라이브 키 교체와 함께 true로 (또는 --dart-define=CARD_PAYMENT_ENABLED=true).
+  static const cardPaymentEnabled =
+      bool.fromEnvironment('CARD_PAYMENT_ENABLED', defaultValue: false);
+
   /// 서비스 웹 주소 — 앱 웹뷰 결제 브릿지 페이지(pay.html)가 여기서 서빙된다.
   static const webBaseUrl = String.fromEnvironment(
     'WEB_BASE_URL',

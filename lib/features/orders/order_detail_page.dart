@@ -300,7 +300,8 @@ class _OrderDetail extends ConsumerWidget {
                 child: const Text('주문 내역 보기'),
               ),
             ],
-            if (order.status == 'pending_payment' &&
+            if (Env.cardPaymentEnabled &&
+                order.status == 'pending_payment' &&
                 order.paymentMethod == 'card' &&
                 cardPaymentSupported) ...[
               const SizedBox(height: 24),
