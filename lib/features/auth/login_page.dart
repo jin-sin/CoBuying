@@ -69,11 +69,46 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 24),
                   const Center(child: CircularProgressIndicator()),
                 ],
+                const SizedBox(height: 32),
+                const _LegalFooter(),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 로그인 시작 = 약관 동의 간주 고지 + 약관/개인정보 링크
+class _LegalFooter extends StatelessWidget {
+  const _LegalFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          '로그인 시 이용약관과 개인정보처리방침에 동의하는 것으로 간주됩니다.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () => context.push('/terms'),
+              child: const Text('이용약관', style: TextStyle(fontSize: 12)),
+            ),
+            const Text('·', style: TextStyle(color: Colors.grey)),
+            TextButton(
+              onPressed: () => context.push('/privacy'),
+              child: const Text('개인정보처리방침', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

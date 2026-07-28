@@ -9,6 +9,8 @@ import '../features/admin/product_edit_page.dart';
 import '../features/auth/auth_providers.dart';
 import '../features/auth/login_page.dart';
 import '../features/cart/cart_page.dart';
+import '../features/info/info_pages.dart';
+import '../features/info/legal.dart';
 import '../features/orders/checkout_page.dart';
 import '../features/orders/order_detail_page.dart';
 import '../features/orders/order_list_page.dart';
@@ -61,6 +63,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      // 법적 고지 (로그인 불필요 — 공개)
+      GoRoute(path: '/info', builder: (_, _) => const InfoHubPage()),
+      GoRoute(
+          path: '/terms',
+          builder: (_, _) => LegalDocPage(doc: termsDoc)),
+      GoRoute(
+          path: '/privacy',
+          builder: (_, _) => LegalDocPage(doc: privacyDoc)),
+      GoRoute(path: '/business', builder: (_, _) => const BusinessInfoPage()),
       GoRoute(
         path: '/product/:id',
         builder: (_, state) =>

@@ -520,6 +520,8 @@ class _ProfileMenu extends ConsumerWidget {
             context.push('/seller');
           case 'admin':
             context.push('/admin');
+          case 'info':
+            context.push('/info');
           case 'logout':
             // 토큰 해제는 세션이 살아있을 때만 가능하므로 로그아웃보다 먼저
             ref
@@ -545,6 +547,13 @@ class _ProfileMenu extends ConsumerWidget {
             ),
           ),
         const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'info',
+          child: ListTile(
+            leading: Icon(Icons.description_outlined),
+            title: Text('약관 및 정책'),
+          ),
+        ),
         const PopupMenuItem(
           value: 'logout',
           child: ListTile(
