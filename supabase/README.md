@@ -88,9 +88,11 @@ flutter run --dart-define=SUPABASE_URL=https://<supabase주소> \
 매일 pg_dump 백업 스크립트가 NAS에 설치돼 있다 (`/volume1/docker/supabase/backup.sh`,
 레포 사본은 `supabase/backup.sh`). 최근 14개를 `backups/`에 보관.
 
-**DSM 작업 스케줄러 등록** (제어판 > 작업 스케줄러 > 생성 > 예약된 작업 > 사용자 정의 스크립트):
-- 사용자: shinnas_admin, 스케줄: 매일 01:30 (NAS 전원 오프 전),
-- 실행 명령: `/volume1/docker/supabase/backup.sh`
+**DSM 작업 스케줄러 등록 완료** — 매일 01:30 실행 (NAS 전원 오프 02시 직전).
+제어판 > 작업 스케줄러의 예약된 작업(사용자 정의 스크립트, 사용자 shinnas_admin,
+실행 명령 `/volume1/docker/supabase/backup.sh`)으로 등록돼 있고, `/etc/crontab`에
+`30 1 * * * root synoschedtask --run id=7` 로 반영돼 있다.
+동작 확인은 `ls -la /volume1/docker/supabase/backups/`로 날짜별 덤프가 쌓이는지 보면 된다.
 
 복원:
 ```bash
@@ -98,5 +100,51 @@ docker exec -i supabase-db pg_restore -U supabase_admin -d postgres \
   --clean --if-exists < backups/cobuying-<날짜>.dump
 ```
 
-추가로 상품 이미지(`volumes/storage`)와 `.env`는 Hyper Backup 대상에
-포함시키는 것을 권장 (오프사이트 백업).
+### 오프사이트 백업 (Cloudflare R2)
+NAS는 볼륨이 하나뿐이라 위 백업만으로는 디스크가 죽을 때 DB와 백업이 같이 사라진다.
+`offsite_backup.sh`가 덤프·상품 이미지(`volumes/storage`)·`.env`를 R2로 올린다.
+NAS에 rclone을 설치하지 않고 `rclone/rclone:1.74` 컨테이너로 실행한다.
+
+**1) R2 버킷과 토큰 준비** (Cloudflare 대시보드 > R2)
+- 버킷 생성: `cobuying-backup` — **퍼블릭 액세스는 반드시 끈 채로 둔다.**
+  덤프에는 회원 개인정보와 `private.app_secrets`(토스 시크릿 키)가 들어 있다.
+- API 토큰 발급: 권한 **Object Read & Write**, 대상은 이 버킷 하나로만 한정.
+  발급되면 Access Key ID / Secret Access Key / 계정 ID를 받는다.
+
+**2) NAS에 rclone 설정 작성** — SSH로 직접 실행 (키를 어디에도 붙여넣지 말 것):
+```
+cat > /volume1/docker/supabase/rclone.conf <<'EOF'
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = <ACCESS_KEY_ID>
+secret_access_key = <SECRET_ACCESS_KEY>
+endpoint = https://<계정ID>.r2.cloudflarestorage.com
+region = auto
+no_check_bucket = true
+EOF
+chmod 600 /volume1/docker/supabase/rclone.conf
+```
+`no_check_bucket = true`는 필수다. 없으면 rclone이 업로드 전에 버킷을 만들려 하는데,
+버킷 하나로 제한된 토큰에는 그 권한이 없어 `CreateBucket ... AccessDenied`로 전부 실패한다.
+같은 이유로 `rclone lsd r2:`(버킷 목록)도 403이 정상이다 — 토큰이 잘 좁혀졌다는 뜻.
+
+**3) 스크립트 설치 후 수동 1회 실행**
+```
+# NAS는 sftp 서브시스템이 꺼져 있어 scp에 -O(레거시 프로토콜)가 필요하다
+scp -O -P 2022 supabase/offsite_backup.sh shinnas_admin@orange-man.xyz:/volume1/docker/supabase/
+ssh -p 2022 shinnas_admin@orange-man.xyz /volume1/docker/supabase/offsite_backup.sh
+```
+
+**4) DSM 작업 스케줄러 등록** — `backup.sh` 직후인 매일 **01:40**,
+사용자 shinnas_admin, 실행 명령 `/volume1/docker/supabase/offsite_backup.sh`.
+(02시 NAS 전원 오프 전에 끝나야 한다.)
+
+R2에서 복원:
+```bash
+rclone --config rclone.conf copy r2:cobuying-backup/backups/cobuying-<날짜>.dump ./
+```
+
+`sync`가 아니라 `copy`라 R2 사본은 지워지지 않는다 — NAS 쪽이 실수나 랜섬웨어로
+날아가도 남는 대신, 14개 로테이션을 넘어선 덤프가 계속 쌓인다. 하루 약 1MB라
+무료 10GB로 몇 년은 여유가 있고, 필요하면 R2 수명 주기 규칙으로 정리하면 된다.
