@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 적응형 아이콘 (Android 8.0+) — 런처가 기기 테마에 맞는 모양으로 잘라낸다.
+     전경 PNG는 108dp 캔버스에 그려져 있고 도안은 가운데 72dp 안전영역 안에 든다.
+     레거시 기기는 mipmap-*/ic_launcher.png(둥근 사각형)를 그대로 쓴다. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/brand.dart';
 import 'auth_providers.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -51,11 +52,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.shopping_bag_outlined, size: 72),
-                const SizedBox(height: 12),
-                Text('공동구매',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium),
+                const Center(child: BrandMark(size: 84)),
+                const SizedBox(height: 16),
+                const Center(child: BrandWordmark(fontSize: 28)),
                 const SizedBox(height: 40),
                 // 네이버·페이스북은 프로바이더 연동 전이라 미노출 (카카오만 운영)
                 _SocialButton(

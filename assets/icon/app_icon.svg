@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <title>오렌지마켓 앱 아이콘 — 오렌지 슬라이스</title>
+  <rect width="100" height="100" rx="24" fill="#FF6B35"/>
+  <circle cx="50" cy="50" r="32" fill="#fff"/>
+  <circle cx="50" cy="50" r="26" fill="#FF6B35"/>
+  <g stroke="#fff" stroke-width="4" stroke-linecap="round">
+    <line x1="50" y1="50" x2="76" y2="50"/>
+    <line x1="50" y1="50" x2="68.4" y2="68.4"/>
+    <line x1="50" y1="50" x2="50" y2="76"/>
+    <line x1="50" y1="50" x2="31.6" y2="68.4"/>
+    <line x1="50" y1="50" x2="24" y2="50"/>
+    <line x1="50" y1="50" x2="31.6" y2="31.6"/>
+    <line x1="50" y1="50" x2="50" y2="24"/>
+    <line x1="50" y1="50" x2="68.4" y2="31.6"/>
+  </g>
+  <circle cx="50" cy="50" r="5" fill="#fff"/>
+</svg>

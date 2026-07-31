@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/brand.dart';
 import '../../core/formatters.dart';
 import '../../core/theme.dart';
 import '../auth/auth_providers.dart';
@@ -114,7 +115,14 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
-        title: const _WordMark(),
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            BrandMark(size: 24),
+            SizedBox(width: 8),
+            BrandWordmark(),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: '검색',
@@ -284,29 +292,6 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 브랜드 워드마크 — "공동구매"에서 '구매'만 오렌지
-class _WordMark extends StatelessWidget {
-  const _WordMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Text.rich(
-      TextSpan(
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.5,
-          color: Color(0xFF1F1A15),
-        ),
-        children: [
-          const TextSpan(text: '공동'),
-          TextSpan(text: '구매', style: TextStyle(color: brandOrange)),
         ],
       ),
     );

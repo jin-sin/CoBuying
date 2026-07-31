@@ -55,7 +55,7 @@ class _CoBuyingAppState extends ConsumerState<CoBuyingApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: '공동구매',
+      title: '오렌지맨',
       theme: buildAppTheme(),
       routerConfig: router,
       // 점검 시간대(서버 전원 스케줄)에는 전체 화면 안내로 덮는다

@@ -31,7 +31,7 @@
 		<string>kakaolink</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Cobuying</string>
+	<string>오렌지맨</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

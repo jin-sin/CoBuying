@@ -2,7 +2,7 @@
     <!-- FCM 푸시 표시 (Android 13+ 는 런타임 권한 — 앱에서 requestPermission) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="cobuying"
+        android:label="오렌지맨"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -9,7 +9,8 @@ library;
 /// 사업자등록번호는 국세청 체크섬 검증을 통과한 값이다.
 /// 값이 바뀌면 여기만 고치면 사업자정보·개인정보처리방침에 함께 반영된다.
 class BusinessInfo {
-  static const serviceName = '공동구매';
+  /// 서비스명 — 통신판매업 신고 상호(companyName)와 같게 맞춰 둔다
+  static const serviceName = '오렌지맨';
 
   /// 상호(법인/사업자명)
   static const companyName = '오렌지맨';
@@ -68,7 +69,7 @@ class LegalDoc {
 
 /// 통신판매중개자 면책 고지 — 상품 상세·체크아웃 등에서 짧게 재사용
 const brokerNotice =
-    '${BusinessInfo.serviceName}은(는) 통신판매중개자로서 통신판매의 당사자가 '
+    '${BusinessInfo.serviceName}은 통신판매중개자로서 통신판매의 당사자가 '
     '아니며, 개별 상품의 상품정보·거래·배송·환불에 대한 책임은 판매자(입점 셀러)에게 '
     '있습니다. 다만 결제·정산 등 중개 과정에서 운영자의 고의 또는 과실이 있는 경우 '
     '그 범위에서 책임을 부담합니다.';
@@ -78,9 +79,10 @@ final termsDoc = LegalDoc(
   updated: '시행일: 2026년 7월 20일',
   sections: [
     ('제1조 (목적)',
-        '본 약관은 ${BusinessInfo.companyName}(이하 "회사")이(가) 운영하는 '
-        '"${BusinessInfo.serviceName}" 서비스(이하 "서비스")의 이용과 관련하여 회사와 '
-        '이용자의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.'),
+        // 상호와 서비스명이 같아 이름을 두 번 적지 않는다
+        '본 약관은 ${BusinessInfo.companyName}(이하 "회사")이 운영하는 통신판매중개 '
+        '서비스(이하 "서비스")의 이용과 관련하여 회사와 이용자의 권리·의무 및 '
+        '책임사항을 규정함을 목적으로 합니다.'),
     ('제2조 (통신판매중개자의 지위)',
         '$brokerNotice\n\n'
         '회사는 판매자가 등록한 상품정보 및 거래에 관여하지 않으며, 각 상품의 '
