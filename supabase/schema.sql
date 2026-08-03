@@ -1881,3 +1881,89 @@ begin
   where id = p_order_id;
 end;
 $$;
+
+-- ------------------------------------------------------------
+-- 27. 운영 헬스체크 (외부 모니터가 읽는 상태 신호)
+--     NAS가 죽으면 DB로는 그 사실을 알릴 수 없다. 그래서 감시는 바깥
+--     (Cloudflare Worker orange-man-monitor)에서 하고, DB는 바깥에서
+--     확인할 수 없는 신호만 모아서 넘겨준다.
+--     백업은 DSM 작업 스케줄러가 돌리는데 실패해도 조용하므로,
+--     스크립트가 성공했을 때만 하트비트를 찍고 그게 늙으면 실패로 본다
+--     (데드맨 스위치 — 스크립트가 아예 안 돈 경우도 같이 잡힌다).
+-- ------------------------------------------------------------
+create table if not exists public.ops_heartbeat (
+  name   text primary key,
+  at     timestamptz not null default now(),
+  detail jsonb
+);
+
+-- 정책 없음 — 기록은 NAS 스크립트가 psql(superuser)로, 조회는 health_check가 한다
+alter table public.ops_heartbeat enable row level security;
+
+create or replace function public.record_heartbeat(p_name text, p_detail jsonb default null)
+returns void
+language sql
+security definer set search_path = public
+as $$
+  insert into public.ops_heartbeat (name, at, detail)
+  values (p_name, now(), p_detail)
+  on conflict (name) do update set at = excluded.at, detail = excluded.detail;
+$$;
+
+revoke execute on function public.record_heartbeat(text, jsonb) from public, anon, authenticated;
+
+-- 모니터가 5분마다 호출한다. anon 키만으로는 못 부르게 토큰을 함께 받는다
+-- (anon 키는 클라이언트에 내장돼 공개된 값이라 그것만으로는 통제가 안 됨).
+create or replace function public.health_check(p_token text)
+returns jsonb
+language plpgsql
+security definer set search_path = public, cron
+stable
+as $fn$
+declare
+  v_token text;
+begin
+  select value into v_token from private.app_secrets where key = 'health_token';
+  if v_token is null or p_token is distinct from v_token then
+    raise exception '권한이 없습니다.';
+  end if;
+
+  return jsonb_build_object(
+    'now', now(),
+    -- 하트비트별 경과 초. 없으면 키 자체가 빠지므로 모니터가 '한 번도 안 돎'으로 처리
+    'heartbeat_age', (
+      select coalesce(
+        jsonb_object_agg(name, round(extract(epoch from now() - at))), '{}'::jsonb)
+      from public.ops_heartbeat
+    ),
+    -- pg_cron 잡별 마지막 성공 이후 경과 초 (잡이 멈추면 계속 커진다)
+    'cron_age', (
+      select coalesce(jsonb_object_agg(jobname, age), '{}'::jsonb)
+      from (
+        select j.jobname,
+               round(extract(epoch from now() - max(d.end_time))) as age
+        from cron.job j
+        left join cron.job_run_details d
+          on d.jobid = j.jobid and d.status = 'succeeded'
+        group by j.jobname
+      ) t
+    ),
+    -- 푸시 큐 적체 (Worker 발송이 막히면 쌓인다)
+    'push_pending', (select count(*) from public.push_queue),
+    'push_oldest_sec', (
+      select coalesce(round(extract(epoch from now() - min(created_at))), 0)
+      from public.push_queue
+    ),
+    'active_products', (select count(*) from public.active_products)
+  );
+end;
+$fn$;
+
+grant execute on function public.health_check(text) to anon, authenticated;
+
+-- 모니터 Worker와 나눠 갖는 토큰. 고정된 기본값을 두면 그걸 그대로 쓰는 설치가
+-- 생기므로 설치마다 임의로 만든다. 값 확인(Worker 시크릿에 넣을 때):
+--   select value from private.app_secrets where key = 'health_token';
+insert into private.app_secrets (key, value)
+values ('health_token', encode(extensions.gen_random_bytes(24), 'hex'))
+on conflict (key) do nothing;

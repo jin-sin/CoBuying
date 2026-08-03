@@ -148,3 +148,22 @@ rclone --config rclone.conf copy r2:cobuying-backup/backups/cobuying-<날짜>.du
 `sync`가 아니라 `copy`라 R2 사본은 지워지지 않는다 — NAS 쪽이 실수나 랜섬웨어로
 날아가도 남는 대신, 14개 로테이션을 넘어선 덤프가 계속 쌓인다. 하루 약 1MB라
 무료 10GB로 몇 년은 여유가 있고, 필요하면 R2 수명 주기 규칙으로 정리하면 된다.
+
+## 8. 장애 모니터링
+NAS가 죽으면 DB도 같이 죽어서 DB로는 알릴 수 없다. 감시는 바깥(Cloudflare Worker
+`orange-man-monitor`)에서 하고 텔레그램으로 알린다 — 설정 절차는
+`tools/cloudflare/monitor-worker/README.md`.
+
+백업 판정은 **데드맨 스위치**다. `backup.sh`·`offsite_backup.sh`가 성공했을 때만
+`record_heartbeat()`를 찍고(schema.sql 27절), 그 값이 26시간 넘게 늙으면 실패로 본다.
+DSM 작업 스케줄러는 실패해도 조용하기 때문에, 스크립트가 실패한 경우와 아예
+실행되지 않은 경우를 함께 잡으려면 이 방식이 필요하다.
+
+**하트비트를 추가한 뒤에는 NAS의 스크립트 사본을 다시 올려야 한다** (레포만 고치면
+NAS는 예전 것을 계속 돌린다):
+```bash
+scp -O -P 2022 supabase/backup.sh supabase/offsite_backup.sh \
+  shinnas_admin@orange-man.xyz:/volume1/docker/supabase/
+ssh -p 2022 shinnas_admin@orange-man.xyz \
+  "chmod +x /volume1/docker/supabase/backup.sh /volume1/docker/supabase/offsite_backup.sh"
+```

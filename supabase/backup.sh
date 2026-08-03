@@ -23,4 +23,10 @@ fi
 # 최근 14개만 보관
 ls -1t "$BACKUP_DIR"/cobuying-*.dump | tail -n +15 | xargs -r rm --
 
+# 성공했을 때만 하트비트 — 이 값이 늙으면 모니터가 백업 실패로 본다 (schema.sql 27절).
+# 실패해도 백업 자체는 성공이므로 종료코드를 망치지 않는다.
+docker exec supabase-db psql -U supabase_admin -d postgres -qtAX -c \
+  "select public.record_heartbeat('db_backup', jsonb_build_object('bytes', $SIZE));" \
+  > /dev/null || echo "heartbeat 기록 실패 (백업은 정상)" >&2
+
 echo "ok: $OUT ($SIZE bytes)"

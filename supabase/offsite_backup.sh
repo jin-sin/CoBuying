@@ -36,4 +36,9 @@ rc lsf "$BUCKET/backups" | grep -qx "$NAME" || {
   exit 1
 }
 
+# 성공했을 때만 하트비트 — 이 값이 늙으면 모니터가 실패로 본다 (schema.sql 27절)
+docker exec supabase-db psql -U supabase_admin -d postgres -qtAX -c \
+  "select public.record_heartbeat('offsite_backup', jsonb_build_object('dump', '$NAME'));" \
+  > /dev/null || echo "heartbeat 기록 실패 (오프사이트 복사는 정상)" >&2
+
 echo "ok: $NAME 포함 오프사이트 복사 완료"

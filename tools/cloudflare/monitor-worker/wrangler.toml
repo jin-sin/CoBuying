@@ -1,0 +1,46 @@
+name = "orange-man-monitor"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# 라우트 없이 workers.dev 주소로 배포 — 크론으로만 돈다.
+# (fetch 핸들러는 설정 확인용이라 토큰이 있어야 응답한다)
+workers_dev = true
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+# 상태 저장 (전환 감지용). 생성 완료 — 다시 만들 일이 있으면:
+#   CLOUDFLARE_ACCOUNT_ID=<계정ID> npx wrangler kv namespace create MONITOR_STATE
+# (계정 ID를 안 주면 wrangler가 KV API에서 인증 오류를 낸다)
+[[kv_namespaces]]
+binding = "MONITOR_STATE"
+id = "f88dfdefc0984b9fa31b58b5797791ea"
+
+[vars]
+SUPABASE_URL = "https://supabase.orange-man.xyz"
+WEB_URL = "https://shop.orange-man.xyz"
+
+# NAS 전원 스케줄. 이 시간대의 다운은 예정된 것이라 감시하지 않는다.
+# app_settings의 maintenance 값과 같이 맞춰 둘 것 (서버가 꺼진 동안에는
+# DB를 읽을 수 없어서 Worker는 이 값을 직접 갖고 있어야 한다).
+WINDOW_START = "02:00"
+WINDOW_END = "08:00"
+
+# 이 시간대에는 텔레그램을 무음으로 보낸다 (기록은 남고 폰은 안 울린다)
+QUIET_START = "23:00"
+QUIET_END = "08:00"
+
+# 백업은 매일 01:30/01:40 → 26시간이면 하루를 통째로 건너뛴 것
+BACKUP_MAX_AGE_SEC = "93600"
+# pg_cron 최장 주기가 10분이라 30분이면 확실히 멈춘 것
+CRON_MAX_AGE_SEC = "1800"
+# 기상 직후에는 마지막 성공이 6시간 전이라 정상인데도 걸린다 — 유예
+CRON_GRACE_MIN = "30"
+# 푸시는 1분마다 나간다. 15분 넘게 남아 있으면 발송이 막힌 것
+PUSH_MAX_AGE_SEC = "900"
+
+# 시크릿 (wrangler secret put 으로 직접 넣을 것 — 이 파일에 적지 말 것):
+#   HEALTH_TOKEN        private.app_secrets의 health_token과 같은 값
+#   SUPABASE_ANON_KEY   NAS의 /volume1/docker/supabase/.env
+#   TELEGRAM_TOKEN      @BotFather가 준 봇 토큰
+#   TELEGRAM_CHAT_ID    봇과 대화를 시작한 뒤 getUpdates로 확인한 값
