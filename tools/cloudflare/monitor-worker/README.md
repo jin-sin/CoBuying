@@ -26,24 +26,47 @@ NAS가 죽으면 DB도 같이 죽어서 DB로는 그 사실을 알릴 수 없다
 
 ## 설정 (1회)
 
-1. **텔레그램 봇 만들기** — 텔레그램에서 `@BotFather`에게 `/newbot`.
-   봇 이름을 정하면 토큰(`123456:ABC-...`)을 준다.
-   그다음 만든 봇과 대화를 시작(`/start`)하고 chat_id를 확인한다:
+1. **텔레그램 봇 만들기 (TELEGRAM_TOKEN)**
+
+   - 텔레그램에서 `@BotFather`를 검색한다 (파란 인증 배지가 붙은 쪽이 진짜).
+   - `/newbot` 을 보낸다.
+   - **표시 이름**을 묻는다 — 아무거나. 예: `오렌지맨 모니터`
+   - **사용자명**을 묻는다 — `bot`으로 끝나야 하고 전 세계에서 유일해야 한다.
+     예: `orangeman_monitor_bot`
+   - 성공하면 `Use this token to access the HTTP API:` 뒤에 토큰이 온다
+     (`8012345678:AAHk9x_...`). 이게 `TELEGRAM_TOKEN`.
+
+2. **chat_id 확인 (TELEGRAM_CHAT_ID)**
+
+   먼저 **만든 봇과 대화를 열고 START를 누르거나 아무 메시지나 보낸다.**
+   텔레그램은 사용자가 먼저 말을 걸지 않은 상대에게 봇이 메시지를 보내는 걸
+   막기 때문에, 이 단계를 건너뛰면 chat_id도 안 나오고 알림도 안 온다.
 
    ```bash
-   curl -s "https://api.telegram.org/bot<토큰>/getUpdates" | grep -o '"id":[0-9-]*' | head -1
+   curl -s "https://api.telegram.org/bot<토큰>/getUpdates" | python3 -c "import sys,json; r=json.load(sys.stdin)['result']; print(*{u['message']['chat']['id'] for u in r if 'message' in u} or ['먼저 봇에게 메시지를 보내세요'], sep='\n')"
    ```
 
-2. **DB 토큰 확인** — 스키마 적용 시 임의 값으로 만들어진다. Worker 시크릿에 넣을
+   나온 숫자가 `TELEGRAM_CHAT_ID` (개인 대화는 양수). `getUpdates`는 최근
+   24시간 메시지만 보여주므로, 비어 있으면 봇에게 메시지를 다시 보내고 재실행.
+
+3. **DB 토큰 확인** — 스키마 적용 시 임의 값으로 만들어진다. Worker 시크릿에 넣을
    값을 Studio SQL 편집기에서 읽어 온다:
 
    ```sql
    select value from private.app_secrets where key = 'health_token';
    ```
 
-3. **KV 네임스페이스** — 이미 만들어져 `wrangler.toml`에 id가 들어 있다. 건너뛴다.
+4. **KV 네임스페이스** — 이미 만들어져 `wrangler.toml`에 id가 들어 있다. 건너뛴다.
 
-4. **시크릿 등록** (네 개를 차례로 물어본다):
+5. **먼저 배포** — 시크릿은 Worker가 이미 존재해야 넣을 수 있다
+   (`Worker "orange-man-monitor" not found`). 그래서 배포가 먼저다.
+   시크릿 없이 돌아도 알림을 보내지 않으니 안전하다.
+
+   ```bash
+   npx wrangler deploy
+   ```
+
+6. **시크릿 등록** (네 개를 차례로 물어본다):
 
    ```bash
    npx wrangler secret put HEALTH_TOKEN
@@ -52,11 +75,13 @@ NAS가 죽으면 DB도 같이 죽어서 DB로는 그 사실을 알릴 수 없다
    npx wrangler secret put TELEGRAM_CHAT_ID
    ```
 
-5. **배포**:
+**반드시 이 디렉터리에서 실행할 것.** 한 단계 위(`tools/cloudflare/`)에는 점검
+Worker의 `wrangler.toml`이 있어서, 거기서 실행하면 에러 없이 엉뚱한 Worker에
+시크릿이 들어간다. 헷갈리면 어디서든 `--config` 경로를 붙이면 된다:
 
-   ```bash
-   npx wrangler deploy
-   ```
+```bash
+npx wrangler deploy --config tools/cloudflare/monitor-worker/wrangler.toml
+```
 
 ## 확인
 
