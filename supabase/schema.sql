@@ -54,9 +54,11 @@ $$;
 create table if not exists public.seller_profiles (
   user_id         uuid primary key references auth.users (id) on delete cascade,
   shop_name       text not null,
-  bank_name       text not null,           -- 정산 은행
-  bank_account    text not null,           -- 정산 계좌번호
-  account_holder  text not null,           -- 예금주
+  -- 정산 계좌는 신청 단계에서 받지 않는다. 아직 팔지도 않았는데 계좌부터 내라고 하면
+  -- 입점 문턱이 크게 올라간다. 승인 후 셀러센터에서 등록하고, 미등록이면 배너로 알린다.
+  bank_name       text not null default '',  -- 정산 은행
+  bank_account    text not null default '',  -- 정산 계좌번호
+  account_holder  text not null default '',  -- 예금주
   contact_phone   text not null default '',
   commission_rate numeric(5,2) not null default 10.00
                     check (commission_rate >= 0 and commission_rate <= 100),
@@ -65,6 +67,11 @@ create table if not exists public.seller_profiles (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+
+-- 이미 만들어진 테이블에도 기본값을 적용 (create table if not exists는 기존 테이블을 안 고친다)
+alter table public.seller_profiles alter column bank_name     set default '';
+alter table public.seller_profiles alter column bank_account   set default '';
+alter table public.seller_profiles alter column account_holder set default '';
 
 create or replace function public.is_approved_seller()
 returns boolean

@@ -30,6 +30,10 @@ class SellerProfile {
 
   bool get isApproved => status == 'approved';
 
+  /// 정산 계좌는 승인 후에 등록한다 — 미등록이면 셀러센터에서 배너로 알린다
+  bool get hasBankAccount =>
+      bankName.isNotEmpty && bankAccount.isNotEmpty && accountHolder.isNotEmpty;
+
   String get statusLabel => switch (status) {
         'pending' => '승인 대기중',
         'approved' => '승인됨',

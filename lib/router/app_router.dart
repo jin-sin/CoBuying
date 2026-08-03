@@ -18,6 +18,7 @@ import '../features/notifications/notifications_page.dart';
 import '../features/orders/payment_result_page.dart';
 import '../features/products/product_detail_page.dart';
 import '../features/products/product_list_page.dart';
+import '../features/seller/partner_page.dart';
 import '../features/seller/seller_home_page.dart';
 import '../features/wishlist/wishlist_page.dart';
 import 'app_shell.dart';
@@ -72,6 +73,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: '/privacy',
           builder: (_, _) => LegalDocPage(doc: privacyDoc)),
       GoRoute(path: '/business', builder: (_, _) => const BusinessInfoPage()),
+      // 셀러 입점 안내 — 공개. 셀러 후보에게 그대로 보낼 수 있는 링크가 필요해서
+      // 로그인 뒤에 있는 /seller와 분리했다 (_authRequired가 /seller 전체를 막는다)
+      GoRoute(path: '/partner', builder: (_, _) => const PartnerPage()),
       GoRoute(
         path: '/product/:id',
         builder: (_, state) =>

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
 import '../orders/orders_providers.dart';
 import '../products/products_providers.dart';
 import 'seller_apply_page.dart';
@@ -116,11 +117,55 @@ class _SellerDashboard extends ConsumerWidget {
           icon: const Icon(Icons.add),
           label: const Text('상품 등록'),
         ),
-        body: TabBarView(children: [
-          const _MyProductsTab(),
-          const _MySalesTab(),
-          _SettlementTab(profile: profile),
-        ]),
+        body: Column(
+          children: [
+            // 계좌는 신청 때 안 받으므로 등록 전까지 눈에 띄게 알린다.
+            // 상품 등록은 막지 않는다 — 파는 게 먼저고 계좌는 첫 정산 전까지면 된다.
+            if (!profile.hasBankAccount)
+              _BankAccountBanner(profile: profile),
+            Expanded(
+              child: TabBarView(children: [
+                const _MyProductsTab(),
+                const _MySalesTab(),
+                _SettlementTab(profile: profile),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BankAccountBanner extends StatelessWidget {
+  const _BankAccountBanner({required this.profile});
+
+  final SellerProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: brandOrange.withValues(alpha: 0.10),
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => SellerApplyPage(existing: profile),
+        )),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.account_balance_outlined,
+                  size: 20, color: brandOrange),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('정산 계좌가 아직 등록되지 않았습니다. '
+                    '판매 대금을 받으려면 첫 정산 전까지 등록해 주세요.',
+                    style: TextStyle(fontSize: 13)),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: brandOrange),
+            ],
+          ),
+        ),
       ),
     );
   }

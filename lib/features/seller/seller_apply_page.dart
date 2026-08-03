@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme.dart';
 import 'seller_profile.dart';
 import 'seller_providers.dart';
 
@@ -63,9 +64,6 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
       } else {
         await repo.apply(
           shopName: _shopName.text.trim(),
-          bankName: _bankName.text.trim(),
-          bankAccount: _bankAccount.text.trim(),
-          accountHolder: _accountHolder.text.trim(),
           contactPhone: _contactPhone.text.trim(),
           businessNumber: _businessNumber.text.trim(),
           onlineSalesNumber: _onlineSalesNumber.text.trim(),
@@ -122,7 +120,7 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
               children: [
                 if (!_isEdit) ...[
                   Text('상품을 판매하려면 입점 신청이 필요합니다.\n'
-                      '판매 대금은 등록한 계좌로 수수료를 제외하고 정산됩니다.',
+                      '정산 계좌는 승인 후에 등록하시면 됩니다.',
                       style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 20),
                 ],
@@ -162,29 +160,44 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
                       labelText: '통신판매업 신고번호 (선택)',
                       hintText: '예: 2026-서울강남-01234'),
                 ),
-                const SizedBox(height: 24),
-                Text('정산 계좌', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _bankName,
-                  decoration: const InputDecoration(labelText: '은행명 *'),
-                  validator: _required,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _bankAccount,
-                  decoration: const InputDecoration(
-                      labelText: '계좌번호 *', hintText: '숫자만 입력 (- 제외)'),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: _required,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _accountHolder,
-                  decoration: const InputDecoration(labelText: '예금주 *'),
-                  validator: _required,
-                ),
+                if (!_isEdit) ...[
+                  const SizedBox(height: 8),
+                  Text('간이과세자·신규 사업자도 신청하실 수 있습니다.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: mutedText)),
+                ],
+                // 정산 계좌는 승인 후 셀러센터에서 등록한다 (신청 문턱을 낮추기 위해)
+                if (_isEdit) ...[
+                  const SizedBox(height: 24),
+                  Text('정산 계좌',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text('첫 정산 전까지 등록하시면 됩니다.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: mutedText)),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _bankName,
+                    decoration: const InputDecoration(labelText: '은행명'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _bankAccount,
+                    decoration: const InputDecoration(
+                        labelText: '계좌번호', hintText: '숫자만 입력 (- 제외)'),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _accountHolder,
+                    decoration: const InputDecoration(labelText: '예금주'),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 FilledButton(
                   onPressed: _submitting ? null : _submit,

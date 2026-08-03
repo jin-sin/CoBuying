@@ -19,12 +19,10 @@ class SellerRepository {
     return row == null ? null : SellerProfile.fromJson(row);
   }
 
-  /// 셀러 입점 신청 (status는 DB 기본값 pending)
+  /// 셀러 입점 신청 (status는 DB 기본값 pending).
+  /// 정산 계좌는 여기서 받지 않는다 — 승인 후 셀러센터에서 등록한다.
   Future<void> apply({
     required String shopName,
-    required String bankName,
-    required String bankAccount,
-    required String accountHolder,
     required String contactPhone,
     required String businessNumber,
     String onlineSalesNumber = '',
@@ -34,9 +32,6 @@ class SellerRepository {
     await _client.from('seller_profiles').insert({
       'user_id': user.id,
       'shop_name': shopName,
-      'bank_name': bankName,
-      'bank_account': bankAccount,
-      'account_holder': accountHolder,
       'contact_phone': contactPhone,
       'business_number': businessNumber,
       'online_sales_number': onlineSalesNumber,

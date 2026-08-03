@@ -12,6 +12,7 @@ class InfoHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(String, IconData, String)>[
+      ('셀러 입점 안내', Icons.storefront_outlined, '/partner'),
       ('이용약관', Icons.description_outlined, '/terms'),
       ('개인정보처리방침', Icons.privacy_tip_outlined, '/privacy'),
       ('사업자정보', Icons.store_outlined, '/business'),

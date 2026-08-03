@@ -556,12 +556,21 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 빈 화면을 그냥 두지 않고 입점 안내로 연결한다 — 셀러가 붙어야 상품이 생긴다
     return ListView(
-      children: const [
-        SizedBox(height: 160),
-        Icon(Icons.storefront_outlined, size: 64, color: Colors.grey),
-        SizedBox(height: 16),
-        Center(child: Text('현재 진행 중인 공동구매가 없습니다.')),
+      children: [
+        const SizedBox(height: 140),
+        const Icon(Icons.storefront_outlined, size: 64, color: Colors.grey),
+        const SizedBox(height: 16),
+        const Center(child: Text('현재 진행 중인 공동구매가 없습니다.')),
+        const SizedBox(height: 24),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/partner'),
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('판매자로 입점하기'),
+          ),
+        ),
       ],
     );
   }
