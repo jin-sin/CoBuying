@@ -1974,3 +1974,78 @@ grant execute on function public.health_check(text) to anon, authenticated;
 insert into private.app_secrets (key, value)
 values ('health_token', encode(extensions.gen_random_bytes(24), 'hex'))
 on conflict (key) do nothing;
+
+-- ------------------------------------------------------------
+-- 28. 셀러 전용 판매 링크 (공개 스토어프론트)
+--     신규 마켓은 트래픽이 없다. 그래서 셀러가 **자기 손님**을 데려올 수 있는
+--     주소를 준다 — 인스타 프로필·카톡 채널에 걸어두는 /s/{slug}.
+--     그 손님이 다른 셀러 상품까지 보게 되면서 마켓 트래픽이 된다.
+--
+--     seller_profiles에는 정산 계좌·연락처가 있어 RLS를 열 수 없으므로,
+--     공개용 칼럼만 뽑은 seller_shops 뷰를 따로 둔다 (비로그인도 조회).
+-- ------------------------------------------------------------
+alter table public.seller_profiles
+  add column if not exists slug  text,
+  add column if not exists intro text not null default '';
+
+-- 링크 주소 형식: 영문 소문자·숫자·하이픈 2~20자, 첫 글자는 하이픈 불가
+alter table public.seller_profiles
+  drop constraint if exists seller_profiles_slug_format;
+alter table public.seller_profiles
+  add constraint seller_profiles_slug_format
+    check (slug is null or slug ~ '^[a-z0-9][a-z0-9-]{1,19}$');
+
+-- 대소문자 구분 없이 유일 (미설정 null은 여러 행 허용)
+create unique index if not exists idx_seller_profiles_slug
+  on public.seller_profiles (lower(slug));
+
+-- 공개 스토어프론트가 읽는 뷰. security_invoker를 끄고(=뷰 소유자 권한으로 실행)
+-- 계좌·연락처·사업자번호를 뺀 칼럼만 내보낸다. 승인된 셀러 + 링크 설정된 셀러만.
+drop view if exists public.seller_shops;
+create view public.seller_shops
+with (security_invoker = false) as
+  select user_id as seller_id, slug, shop_name, intro, created_at
+  from public.seller_profiles
+  where status = 'approved' and slug is not null;
+
+grant select on public.seller_shops to anon, authenticated;
+
+-- 링크 주소 설정. 형식·중복·예약어를 서버에서 검사해 사람이 읽을 오류를 돌려준다.
+-- (테이블 update로도 바꿀 수 있지만 그러면 중복이 unique 위반 원문으로 튀어나온다)
+create or replace function public.set_my_shop_slug(p_slug text)
+returns text
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_slug text := lower(trim(coalesce(p_slug, '')));
+begin
+  if not public.is_approved_seller() then
+    raise exception '승인된 셀러만 판매 링크를 만들 수 있습니다.';
+  end if;
+
+  if v_slug !~ '^[a-z0-9][a-z0-9-]{1,19}$' then
+    raise exception '링크 주소는 영문 소문자·숫자·하이픈 2~20자여야 합니다.';
+  end if;
+
+  -- 앱 라우트와 겹치면 링크가 엉뚱한 화면을 연다
+  if v_slug = any (array[
+      'admin', 'seller', 'partner', 'login', 'info', 'terms', 'privacy',
+      'business', 'cart', 'checkout', 'orders', 'order', 'product', 'payment',
+      'wishlist', 'notifications', 's', 'api', 'www', 'app', 'shop', 'help',
+      'about', 'support', 'new', 'null']) then
+    raise exception '사용할 수 없는 주소입니다.';
+  end if;
+
+  if exists (select 1 from public.seller_profiles
+             where lower(slug) = v_slug and user_id <> auth.uid()) then
+    raise exception '이미 다른 셀러가 쓰고 있는 주소입니다.';
+  end if;
+
+  update public.seller_profiles set slug = v_slug where user_id = auth.uid();
+  return v_slug;
+end;
+$$;
+
+revoke execute on function public.set_my_shop_slug(text) from public, anon;
+grant execute on function public.set_my_shop_slug(text) to authenticated;

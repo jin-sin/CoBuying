@@ -27,6 +27,19 @@ final mySettlementProvider = FutureProvider.autoDispose<SellerSettlement>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchMySettlement(),
 );
 
+/// 공개 스토어프론트: 링크 주소(/s/{slug})로 찾은 셀러. 없으면 null.
+final shopBySlugProvider =
+    FutureProvider.autoDispose.family<SellerShop?, String>(
+  (ref, slug) => ref.watch(sellerRepositoryProvider).fetchShopBySlug(slug),
+);
+
+/// 상품 상세에서 판매자 이름 → 스토어프론트 연결용 (링크 미설정이면 null)
+final shopBySellerIdProvider =
+    FutureProvider.autoDispose.family<SellerShop?, String>(
+  (ref, sellerId) =>
+      ref.watch(sellerRepositoryProvider).fetchShopBySellerId(sellerId),
+);
+
 /// 관리자용: 전체 셀러 목록 (페이지 재진입 시 다시 조회)
 final allSellersProvider = FutureProvider.autoDispose<List<SellerProfile>>(
   (ref) => ref.watch(sellerRepositoryProvider).fetchAllSellers(),

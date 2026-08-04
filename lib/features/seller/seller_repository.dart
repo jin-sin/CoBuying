@@ -47,6 +47,7 @@ class SellerRepository {
     required String contactPhone,
     required String businessNumber,
     String onlineSalesNumber = '',
+    String intro = '',
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('로그인이 필요합니다.');
@@ -58,7 +59,37 @@ class SellerRepository {
       'contact_phone': contactPhone,
       'business_number': businessNumber,
       'online_sales_number': onlineSalesNumber,
+      'intro': intro,
     }).eq('user_id', user.id);
+  }
+
+  // ----- 전용 판매 링크 (/s/{slug}) -----
+
+  /// 링크 주소 설정. 형식·중복·예약어 검사는 DB RPC가 한다 (schema.sql 28절).
+  Future<String> setShopSlug(String slug) async {
+    final result =
+        await _client.rpc('set_my_shop_slug', params: {'p_slug': slug});
+    return result as String;
+  }
+
+  /// 공개 스토어프론트: 링크 주소로 셀러 찾기 (비로그인도 조회 가능)
+  Future<SellerShop?> fetchShopBySlug(String slug) async {
+    final row = await _client
+        .from('seller_shops')
+        .select()
+        .eq('slug', slug.toLowerCase())
+        .maybeSingle();
+    return row == null ? null : SellerShop.fromJson(row);
+  }
+
+  /// 상품 상세에서 판매자 이름을 스토어프론트로 연결할 때 (링크 미설정이면 null)
+  Future<SellerShop?> fetchShopBySellerId(String sellerId) async {
+    final row = await _client
+        .from('seller_shops')
+        .select()
+        .eq('seller_id', sellerId)
+        .maybeSingle();
+    return row == null ? null : SellerShop.fromJson(row);
   }
 
   /// 내 판매 내역: 내 상품이 팔린 주문 아이템 + 주문 정보

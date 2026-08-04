@@ -1,3 +1,5 @@
+import '../../core/env.dart';
+
 class SellerProfile {
   const SellerProfile({
     required this.userId,
@@ -10,6 +12,8 @@ class SellerProfile {
     required this.status,
     this.businessNumber = '',
     this.onlineSalesNumber = '',
+    this.slug,
+    this.intro = '',
   });
 
   final String userId;
@@ -22,6 +26,8 @@ class SellerProfile {
   final String status; // pending | approved | rejected | suspended
   final String businessNumber; // 사업자등록번호 (숫자 10자리)
   final String onlineSalesNumber; // 통신판매업 신고번호 (선택)
+  final String? slug; // 전용 판매 링크 주소 (/s/{slug}) — 미설정이면 null
+  final String intro; // 스토어프론트 한 줄 소개
 
   /// 000-00-00000 표시용
   String get businessNumberFormatted => businessNumber.length == 10
@@ -53,8 +59,40 @@ class SellerProfile {
         status: json['status'] as String,
         businessNumber: json['business_number'] as String? ?? '',
         onlineSalesNumber: json['online_sales_number'] as String? ?? '',
+        slug: json['slug'] as String?,
+        intro: json['intro'] as String? ?? '',
       );
 }
+
+/// 공개 스토어프론트가 보는 셀러 (seller_shops 뷰 — 계좌·연락처는 들어있지 않다)
+class SellerShop {
+  const SellerShop({
+    required this.sellerId,
+    required this.slug,
+    required this.shopName,
+    this.intro = '',
+    this.createdAt,
+  });
+
+  final String sellerId;
+  final String slug;
+  final String shopName;
+  final String intro;
+  final DateTime? createdAt;
+
+  factory SellerShop.fromJson(Map<String, dynamic> json) => SellerShop(
+        sellerId: json['seller_id'] as String,
+        slug: json['slug'] as String,
+        shopName: json['shop_name'] as String,
+        intro: json['intro'] as String? ?? '',
+        createdAt: json['created_at'] == null
+            ? null
+            : DateTime.parse(json['created_at'] as String),
+      );
+}
+
+/// 공유용 전체 주소. nginx가 /s/{slug}를 해시 라우트로 넘겨준다 (tools/nginx.conf).
+String shopUrl(String slug) => '${Env.webBaseUrl}/s/$slug';
 
 /// seller_balances 뷰의 한 행 (누적 정산액과 지급 차감 잔액)
 class SellerSettlement {

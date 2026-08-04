@@ -24,6 +24,13 @@ final myProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) {
   return ref.watch(productsRepositoryProvider).fetchMyProducts();
 });
 
+/// 공개 스토어프론트(/s/{slug})용: 한 셀러의 상품 (마감분 포함)
+final shopProductsProvider =
+    FutureProvider.autoDispose.family<List<Product>, String>(
+  (ref, sellerId) =>
+      ref.watch(productsRepositoryProvider).fetchShopProducts(sellerId),
+);
+
 final productProvider = FutureProvider.autoDispose.family<Product?, String>(
   (ref, id) => ref.watch(productsRepositoryProvider).fetchProduct(id),
 );

@@ -37,6 +37,18 @@ class ProductsRepository {
     return rows.map(Product.fromJson).toList();
   }
 
+  /// 공개 스토어프론트용: 한 셀러의 상품 (숨김 제외 — RLS도 같은 조건).
+  /// 마감된 것까지 가져온다. 지난 공구가 보여야 스토어가 살아있어 보인다.
+  Future<List<Product>> fetchShopProducts(String sellerId) async {
+    final rows = await _client
+        .from('products')
+        .select()
+        .eq('seller_id', sellerId)
+        .neq('status', 'hidden')
+        .order('ends_at', ascending: false);
+    return rows.map(Product.fromJson).toList();
+  }
+
   Future<Product?> fetchProduct(String id) async {
     final row =
         await _client.from('products').select().eq('id', id).maybeSingle();

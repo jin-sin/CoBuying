@@ -31,6 +31,7 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
       TextEditingController(text: widget.existing?.businessNumber);
   late final _onlineSalesNumber =
       TextEditingController(text: widget.existing?.onlineSalesNumber);
+  late final _intro = TextEditingController(text: widget.existing?.intro);
   bool _submitting = false;
 
   bool get _isEdit => widget.existing != null;
@@ -39,7 +40,7 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
   void dispose() {
     for (final c in [
       _shopName, _bankName, _bankAccount, _accountHolder, _contactPhone,
-      _businessNumber, _onlineSalesNumber,
+      _businessNumber, _onlineSalesNumber, _intro,
     ]) {
       c.dispose();
     }
@@ -60,6 +61,7 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
           contactPhone: _contactPhone.text.trim(),
           businessNumber: _businessNumber.text.trim(),
           onlineSalesNumber: _onlineSalesNumber.text.trim(),
+          intro: _intro.text.trim(),
         );
       } else {
         await repo.apply(
@@ -138,6 +140,20 @@ class _SellerApplyPageState extends ConsumerState<SellerApplyPage> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: _required,
                 ),
+                // 스토어 소개는 전용 판매 링크(/s/{slug}) 상단에 걸린다.
+                // 신청 단계에서는 받지 않는다 — 문턱을 낮추는 원칙 그대로.
+                if (_isEdit) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _intro,
+                    maxLines: 3,
+                    maxLength: 200,
+                    decoration: const InputDecoration(
+                      labelText: '스토어 한 줄 소개 (선택)',
+                      hintText: '내 판매 링크 상단에 표시됩니다.',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 Text('사업자 정보', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 12),

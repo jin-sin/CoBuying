@@ -10,6 +10,7 @@ import 'seller_apply_page.dart';
 import 'seller_profile.dart';
 import 'seller_providers.dart';
 import 'shipping_list_page.dart';
+import 'shop_link_card.dart';
 import 'tracking_dialog.dart';
 
 /// 셀러센터.
@@ -125,7 +126,7 @@ class _SellerDashboard extends ConsumerWidget {
               _BankAccountBanner(profile: profile),
             Expanded(
               child: TabBarView(children: [
-                const _MyProductsTab(),
+                _MyProductsTab(profile: profile),
                 const _MySalesTab(),
                 _SettlementTab(profile: profile),
               ]),
@@ -172,7 +173,9 @@ class _BankAccountBanner extends StatelessWidget {
 }
 
 class _MyProductsTab extends ConsumerWidget {
-  const _MyProductsTab();
+  const _MyProductsTab({required this.profile});
+
+  final SellerProfile profile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -183,35 +186,40 @@ class _MyProductsTab extends ConsumerWidget {
       error: (e, _) => Center(child: Text('불러오기 실패\n$e')),
       data: (items) => RefreshIndicator(
         onRefresh: () => ref.refresh(myProductsProvider.future),
-        child: items.isEmpty
-            ? ListView(children: const [
-                SizedBox(height: 160),
-                Center(child: Text('등록한 상품이 없습니다.\n오른쪽 아래 버튼으로 등록해 보세요.',
-                    textAlign: TextAlign.center)),
-              ])
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: items.length,
-                itemBuilder: (context, i) {
-                  final p = items[i];
-                  final statusLabel = switch (p.status) {
-                    'active' => p.isExpired ? '기한 만료' : '판매중',
-                    'closed' => '마감',
-                    'hidden' => '숨김',
-                    _ => p.status,
-                  };
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      title: Text(p.title),
-                      subtitle: Text(
-                          '${formatWon(p.price)} · 재고 ${p.stock} · ~${formatDateTime(p.endsAt)} · $statusLabel'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/seller/product/${p.id}'),
-                    ),
-                  );
-                },
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          // 첫 칸은 전용 판매 링크 카드 — 상품이 없어도 항상 보인다
+          itemCount: items.length + (items.isEmpty ? 2 : 1),
+          itemBuilder: (context, index) {
+            if (index == 0) return ShopLinkCard(profile: profile);
+            if (items.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.only(top: 60),
+                child: Center(
+                  child: Text('등록한 상품이 없습니다.\n오른쪽 아래 버튼으로 등록해 보세요.',
+                      textAlign: TextAlign.center),
+                ),
+              );
+            }
+            final p = items[index - 1];
+            final statusLabel = switch (p.status) {
+              'active' => p.isExpired ? '기한 만료' : '판매중',
+              'closed' => '마감',
+              'hidden' => '숨김',
+              _ => p.status,
+            };
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(p.title),
+                subtitle: Text(
+                    '${formatWon(p.price)} · 재고 ${p.stock} · ~${formatDateTime(p.endsAt)} · $statusLabel'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/seller/product/${p.id}'),
               ),
+            );
+          },
+        ),
       ),
     );
   }

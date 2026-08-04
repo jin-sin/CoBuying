@@ -12,9 +12,37 @@ import '../cart/cart_providers.dart';
 import '../reviews/review.dart';
 import '../reviews/reviews_providers.dart';
 import '../reviews/widgets/product_reviews_section.dart';
+import '../seller/seller_providers.dart';
 import '../wishlist/wishlist_providers.dart';
 import 'product.dart';
 import 'products_providers.dart';
+
+/// 판매자 이름 줄. 그 셀러가 전용 판매 링크(/s/{slug})를 만들어 뒀으면
+/// 스토어프론트로 넘긴다 — 한 상품을 보러 온 손님이 그 셀러의 다른 공구까지
+/// 보게 하는 게 링크의 절반이다. 링크가 없으면 이름만 보여준다.
+class _ShopLine extends ConsumerWidget {
+  const _ShopLine({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sellerId = product.sellerId;
+    final shop = sellerId == null
+        ? null
+        : ref.watch(shopBySellerIdProvider(sellerId)).value;
+    const style = TextStyle(fontSize: 12, color: Color(0xFF9B948C));
+
+    if (shop == null) return Text(product.shopName, style: style);
+    return InkWell(
+      onTap: () => context.push('/s/${shop.slug}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text('${shop.shopName} ›', style: style),
+      ),
+    );
+  }
+}
 
 /// 상품 상세 — 시안 C: 풀블리드 이미지 + 흰 시트 + 숫자 스탯 타일.
 /// 상세 이미지에는 스크림을 깔지 않는다 (글자가 사진 위에 없으므로).
@@ -149,10 +177,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (product.shopName.isNotEmpty)
-                              Text('${product.shopName} ›',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF9B948C))),
+                              _ShopLine(product: product),
                             const SizedBox(height: 2),
                             Text(product.title,
                                 style: const TextStyle(

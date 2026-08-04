@@ -20,6 +20,7 @@ import '../features/products/product_detail_page.dart';
 import '../features/products/product_list_page.dart';
 import '../features/seller/partner_page.dart';
 import '../features/seller/seller_home_page.dart';
+import '../features/seller/shop_page.dart';
 import '../features/wishlist/wishlist_page.dart';
 import 'app_shell.dart';
 
@@ -76,6 +77,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 셀러 입점 안내 — 공개. 셀러 후보에게 그대로 보낼 수 있는 링크가 필요해서
       // 로그인 뒤에 있는 /seller와 분리했다 (_authRequired가 /seller 전체를 막는다)
       GoRoute(path: '/partner', builder: (_, _) => const PartnerPage()),
+      // 셀러 전용 판매 링크 — 공개. 셀러가 인스타·카톡에 걸어두는 주소라
+      // 로그인 벽을 두면 안 된다. 짧게 유지하려고 /s 로 잡았다.
+      GoRoute(
+        path: '/s/:slug',
+        builder: (_, state) => ShopPage(slug: state.pathParameters['slug']!),
+      ),
       GoRoute(
         path: '/product/:id',
         builder: (_, state) =>

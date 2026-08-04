@@ -201,3 +201,32 @@ sleep 10   # 포트가 열려도 postgres가 아직 "starting up"일 수 있다
 ```bash
 cd /volume1/docker/supabase && docker-compose up -d --no-deps auth realtime supavisor
 ```
+
+## 10. 셀러 전용 판매 링크 (`/s/{slug}`)
+셀러가 인스타 프로필·카톡 채널에 걸어 **자기 손님을 데려오는** 공개 스토어
+주소. 배포는 두 군데를 손봐야 한다.
+
+**1) DB** — `schema.sql` 28절을 Studio > SQL Editor에서 실행 (추가만 하므로
+기존 데이터에 영향 없음).
+
+```sql
+-- 적용 확인
+select slug, shop_name from public.seller_shops;
+```
+
+**2) nginx** — Flutter 웹이 해시 라우팅이라 그대로 두면 공유 주소가
+`/#/s/foo`가 된다. NAS의 `/volume1/docker/cobuying-web/nginx.conf`를
+`tools/nginx.conf` 사본으로 맞춘 뒤 리로드:
+
+```bash
+docker exec cobuying-web nginx -t && docker exec cobuying-web nginx -s reload
+```
+
+nginx를 안 고쳐도 앱·웹 안에서는 링크가 동작한다. 밖에서 온 `/s/foo` 주소만
+안 열린다 (index.html이 뜨고 홈으로 간다).
+
+`seller_shops` 뷰는 `security_invoker = false`다. `seller_profiles`에는 정산
+계좌·연락처·사업자번호가 있어 RLS를 열 수 없으므로, 공개해도 되는 칼럼만
+뽑은 이 뷰에만 anon 조회 권한을 준다. Supabase 린터가 "security definer
+view"로 경고하지만 의도된 것이다 — 뷰에 칼럼을 추가할 때 무엇이 공개되는지
+다시 확인할 것.
