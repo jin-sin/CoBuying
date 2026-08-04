@@ -167,3 +167,37 @@ scp -O -P 2022 supabase/backup.sh supabase/offsite_backup.sh \
 ssh -p 2022 shinnas_admin@orange-man.xyz \
   "chmod +x /volume1/docker/supabase/backup.sh /volume1/docker/supabase/offsite_backup.sh"
 ```
+
+## 9. 부팅 시 컨테이너 죽는 문제 (wait-for-db)
+NAS 전원이 켜질 때 Docker는 `restart` 정책만 보고 컨테이너를 되살린다 — compose의
+`depends_on`은 `docker compose up`에만 적용되므로 **부팅 순서를 보장하지 못한다**.
+그래서 `db`가 아직 뜨기 전에 `auth`·`realtime`·`supavisor`가 먼저 올라와
+마이그레이션에 실패하고 fatal 종료 → 재시작 루프를 돌았다 (90초쯤 뒤 자력 복구).
+DSM Container Manager는 이 종료를 "예기치 않게 중지되었습니다" 메일로 보낸다.
+
+NAS의 `/volume1/docker/supabase/docker-compose.yml` 세 서비스에 **db 포트가 열릴
+때까지 기다렸다 시작하는 게이트**를 넣어 해결했다 (백업: `docker-compose.yml.bak-waitfordb`).
+
+| 서비스 | 넣은 곳 | 대기 방법 |
+|---|---|---|
+| `auth` (gotrue) | `entrypoint` | alpine이라 bash가 없다 → `nc -z` |
+| `realtime` | `entrypoint` | `exec 3<>/dev/tcp/...` (bash 내장) |
+| `supavisor` (pooler) | 기존 `command` 앞 | 위와 동일, 셸을 `/bin/bash`로 교체 |
+
+```
+until (exec 3<>/dev/tcp/${POSTGRES_HOST}/${POSTGRES_PORT}) 2>/dev/null; do sleep 3; done
+sleep 10   # 포트가 열려도 postgres가 아직 "starting up"일 수 있다
+```
+
+주의할 점:
+- `entrypoint`를 덮어쓰므로 이미지의 원래 entrypoint를 그대로 다시 불러줘야 한다
+  (realtime은 `/usr/bin/tini -s -g -- /app/run.sh /app/bin/server`). **이미지 버전을
+  올릴 때 원래 entrypoint가 바뀌지 않았는지 확인할 것.**
+- 스크립트 안의 `$`는 compose가 변수로 먹으므로 `$$`로 이스케이프한다.
+- db가 영영 안 뜨면 컨테이너는 죽는 대신 조용히 기다린다. 실제 장애 감지는
+  8절의 외부 모니터가 맡는다.
+
+적용은 db를 건드리지 않고 세 개만 재생성:
+```bash
+cd /volume1/docker/supabase && docker-compose up -d --no-deps auth realtime supavisor
+```
