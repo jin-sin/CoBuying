@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'group_buy.dart';
 import 'product.dart';
 
 class ProductsRepository {
@@ -47,6 +48,19 @@ class ProductsRepository {
         .neq('status', 'hidden')
         .order('ends_at', ascending: false);
     return rows.map(Product.fromJson).toList();
+  }
+
+  /// 목표 수량이 걸린 상품들의 진행률. 비로그인도 조회 가능한 뷰라
+  /// 손님이 로그인 전에도 "몇 개 모였는지"를 볼 수 있다.
+  Future<Map<String, GroupBuyProgress>> fetchGroupBuyProgress() async {
+    final rows = await _client
+        .from('product_progress')
+        .select()
+        .gt('min_quantity', 0);
+    return {
+      for (final row in rows)
+        row['product_id'] as String: GroupBuyProgress.fromJson(row),
+    };
   }
 
   Future<Product?> fetchProduct(String id) async {

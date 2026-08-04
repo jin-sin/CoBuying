@@ -51,6 +51,7 @@ class Product {
     this.salePrice,
     this.saleStartsAt,
     this.saleEndsAt,
+    this.minQuantity = 0,
   });
 
   final String id;
@@ -71,6 +72,13 @@ class Product {
   final int? salePrice; // 타임세일가 (셀러 예약 할인)
   final DateTime? saleStartsAt;
   final DateTime? saleEndsAt;
+
+  /// 공동구매 목표 수량. 0이면 목표 없이 파는 상시 판매.
+  /// 마감 때 입금 완료 수량이 이 값에 못 미치면 DB가 전량 취소·환불한다
+  /// (schema.sql 30절 settle_group_buys).
+  final int minQuantity;
+
+  bool get hasMinQuantity => minQuantity > 0;
 
   /// 지금 타임세일 적용 중인지 (서버 create_order의 effective_price와 동일 판정)
   bool get isOnTimeSale {
@@ -141,6 +149,7 @@ class Product {
         saleEndsAt: json['sale_ends_at'] == null
             ? null
             : DateTime.parse(json['sale_ends_at'] as String),
+        minQuantity: (json['min_quantity'] as num?)?.toInt() ?? 0,
       );
 
   Map<String, dynamic> toInsertJson() => {
@@ -158,5 +167,6 @@ class Product {
         'sale_price': salePrice,
         'sale_starts_at': saleStartsAt?.toUtc().toIso8601String(),
         'sale_ends_at': saleEndsAt?.toUtc().toIso8601String(),
+        'min_quantity': minQuantity,
       };
 }

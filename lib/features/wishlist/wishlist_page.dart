@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/widgets.dart';
 import '../products/product.dart';
+import '../products/products_providers.dart';
 import '../products/widgets/product_card.dart';
 import '../reviews/reviews_providers.dart';
 import 'wishlist_providers.dart';
@@ -61,6 +62,9 @@ class WishlistPage extends ConsumerWidget {
                   itemBuilder: (context, i) => ProductCard(
                     product: products[i],
                     stats: reviewStats?[products[i].id],
+                    progress: ref
+                        .watch(groupBuyProgressProvider)
+                        .value?[products[i].id],
                     wished: true,
                     onWishToggle: (_) =>
                         _remove(context, ref, products[i]),

@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../auth/auth_providers.dart';
 import '../info/legal.dart';
+import '../products/group_buy.dart';
 import '../products/product.dart';
 import '../products/products_providers.dart';
 import '../products/widgets/product_card.dart';
@@ -86,6 +87,8 @@ class _ShopView extends ConsumerWidget {
     final reviewStats =
         ref.watch(allReviewStatsProvider).value ?? const <String, ReviewStats>{};
     final wishedIds = ref.watch(myWishlistIdsProvider).value ?? const <String>{};
+    final groupBuy = ref.watch(groupBuyProgressProvider).value ??
+        const <String, GroupBuyProgress>{};
 
     // 앱바를 두지 않는다. 상호명이 바로 아래 헤더와 겹쳐 두 번 나오고, 링크로 온
     // 손님한테는 화면 맨 위 제일 좋은 자리에 '나가기'를 놓는 꼴이 된다.
@@ -154,6 +157,7 @@ class _ShopView extends ConsumerWidget {
                         _ProductGrid(
                           products: live,
                           reviewStats: reviewStats,
+                          groupBuy: groupBuy,
                           wishedIds: wishedIds,
                           onWishToggle: (p, w) =>
                               _toggleWish(context, ref, p, w),
@@ -170,6 +174,7 @@ class _ShopView extends ConsumerWidget {
                         _ProductGrid(
                           products: past,
                           reviewStats: reviewStats,
+                          groupBuy: groupBuy,
                           wishedIds: wishedIds,
                           onWishToggle: (p, w) =>
                               _toggleWish(context, ref, p, w),
@@ -320,12 +325,14 @@ class _ProductGrid extends StatelessWidget {
   const _ProductGrid({
     required this.products,
     required this.reviewStats,
+    required this.groupBuy,
     required this.wishedIds,
     required this.onWishToggle,
   });
 
   final List<Product> products;
   final Map<String, ReviewStats> reviewStats;
+  final Map<String, GroupBuyProgress> groupBuy;
   final Set<String> wishedIds;
   final void Function(Product product, bool wished) onWishToggle;
 
@@ -344,6 +351,7 @@ class _ProductGrid extends StatelessWidget {
           (context, i) => ProductCard(
             product: products[i],
             stats: reviewStats[products[i].id],
+            progress: groupBuy[products[i].id],
             wished: wishedIds.contains(products[i].id),
             onWishToggle: (wished) => onWishToggle(products[i], wished),
           ),

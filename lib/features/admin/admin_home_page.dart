@@ -11,15 +11,16 @@ import '../orders/orders_providers.dart';
 import '../products/products_providers.dart';
 import '../seller/seller_profile.dart';
 import '../seller/seller_providers.dart';
+import 'refund_queue_tab.dart';
 
-/// 관리자 홈: 셀러 관리 / 상품 관리 / 주문 관리 탭
+/// 관리자 홈: 셀러 관리 / 상품 관리 / 주문 관리 / 정산 / 환불 탭
 class AdminHomePage extends ConsumerWidget {
   const AdminHomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('관리자'),
@@ -38,6 +39,7 @@ class AdminHomePage extends ConsumerWidget {
             Tab(text: '상품 관리'),
             Tab(text: '주문 관리'),
             Tab(text: '정산'),
+            Tab(text: '환불'),
           ]),
         ),
         body: const TabBarView(children: [
@@ -45,6 +47,7 @@ class AdminHomePage extends ConsumerWidget {
           _AdminProductsTab(),
           _AdminOrdersTab(),
           _AdminSettlementTab(),
+          AdminRefundsTab(),
         ]),
       ),
     );

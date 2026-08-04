@@ -16,6 +16,29 @@ import '../seller/seller_providers.dart';
 import '../wishlist/wishlist_providers.dart';
 import 'product.dart';
 import 'products_providers.dart';
+import 'widgets/group_buy_bar.dart';
+
+/// 목표 수량 진행바 + 미달 시 어떻게 되는지 안내.
+/// 진행률은 별도 뷰라 상품과 따로 불러온다 (로딩 중에는 자리만 비워둔다).
+class _GroupBuySection extends ConsumerWidget {
+  const _GroupBuySection({required this.productId});
+
+  final String productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(groupBuyProgressProvider).value?[productId];
+    if (progress == null || !progress.hasGoal) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GroupBuyBar(progress: progress),
+        const SizedBox(height: 12),
+        GroupBuyNotice(progress: progress),
+      ],
+    );
+  }
+}
 
 /// 판매자 이름 줄. 그 셀러가 전용 판매 링크(/s/{slug})를 만들어 뒀으면
 /// 스토어프론트로 넘긴다 — 한 상품을 보러 온 손님이 그 셀러의 다른 공구까지
@@ -187,6 +210,10 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                             _PriceRow(product: product),
                             const SizedBox(height: 14),
                             _StatTiles(product: product, stats: stats),
+                            if (product.hasMinQuantity) ...[
+                              const SizedBox(height: 14),
+                              _GroupBuySection(productId: product.id),
+                            ],
                             if (product.options.isNotEmpty) ...[
                               const SizedBox(height: 18),
                               for (final group in product.options)

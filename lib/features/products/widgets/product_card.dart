@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/formatters.dart';
 import '../../../core/theme.dart';
 import '../../reviews/review.dart';
+import '../group_buy.dart';
 import '../product.dart';
 import 'countdown_badge.dart';
+import 'group_buy_bar.dart';
 
 /// 상품 카드 — 시안 C: 정보가 사진 위로 (하단 스크림 + 온이미지 텍스트).
 /// 홈 그리드와 찜 목록에서 함께 쓴다.
@@ -17,12 +19,16 @@ class ProductCard extends StatelessWidget {
     this.stats,
     this.wished = false,
     this.onWishToggle,
+    this.progress,
   });
 
   final Product product;
   final ReviewStats? stats;
   final bool wished;
   final ValueChanged<bool>? onWishToggle;
+
+  /// 목표 수량이 걸린 공동구매면 진행바를 사진 위에 얹는다
+  final GroupBuyProgress? progress;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +101,11 @@ class ProductCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (progress != null && progress!.hasGoal) ...[
+                  const SizedBox(height: 5),
+                  GroupBuyBar(
+                      progress: progress!, compact: true, onImage: true),
+                ],
                 if (stats != null && stats!.reviewCount > 0)
                   Row(
                     children: [

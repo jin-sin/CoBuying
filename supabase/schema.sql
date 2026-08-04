@@ -2077,3 +2077,319 @@ update public.seller_profiles
  where commission_rate = 10.00;
 
 alter table public.seller_profiles enable trigger trg_protect_seller_privileges;
+
+-- ------------------------------------------------------------
+-- 30. 최소 수량 공동구매 (MOQ)
+--     인포크마켓 같은 '셀러 각자 스토어'가 구조적으로 못 하는 유일한 것이
+--     수요 집계다. 목표 수량을 걸어두고 마감 때 미달이면 전원 취소·환불하면
+--     셀러는 재고를 미리 쌓지 않고도 팔 수 있다.
+--
+--     판정 규칙 (운영자 결정):
+--       * 모인 수량 = **입금 완료 이후** 주문만. 실제 돈이 들어온 수요라야
+--         발주 근거가 된다.
+--       * 판정 시점 = **마감 즉시**. 대신 MOQ 상품은 무통장 입금 기한을
+--         24시간이 아니라 '공구 마감'으로 당겨서, 마감 순간 모든 게 확정되게
+--         한다 (settle_group_buys가 세기 전에 미입금 주문을 먼저 취소한다).
+--
+--     환불: 현재 운영은 무통장입금만 켜져 있어 자동 환불이 불가능하다.
+--     그래서 무산 건은 refund_requests에 쌓고 관리자가 계좌로 이체한 뒤
+--     완료 처리한다. 카드 주문이면서 주문 전체가 취소되는 경우만
+--     refund_card_payment로 자동 환불된다 (부분 취소는 토스 부분취소가
+--     필요해 아직 수동 — 관리자 메모로 안내).
+-- ------------------------------------------------------------
+
+-- 목표 수량. 0이면 기존과 동일한 상시 판매라 기존 상품은 영향 없다.
+alter table public.products
+  add column if not exists min_quantity integer not null default 0;
+alter table public.products drop constraint if exists products_min_quantity_check;
+alter table public.products
+  add constraint products_min_quantity_check check (min_quantity >= 0);
+
+-- 판정 완료 표시 — 중복 판정·중복 알림을 막는다
+alter table public.products
+  add column if not exists moq_settled_at timestamptz;
+
+-- 진행률 뷰와 판정 함수가 모두 product_id로 훑는다
+create index if not exists idx_order_items_product
+  on public.order_items (product_id);
+
+-- 아이템 단위 취소 (무산분). 배송 단계 계산에서는 빼야 한다.
+alter table public.order_items drop constraint if exists order_items_status_check;
+alter table public.order_items
+  add constraint order_items_status_check
+    check (status in ('preparing', 'shipped', 'delivered', 'cancelled'));
+
+-- ── 진행률 ────────────────────────────────────────────────────
+-- 비로그인 손님도 봐야 하는데 order_items는 RLS로 본인 것만 보인다.
+-- security_invoker를 꺼서 집계는 정확히 하되, 내보내는 건 상품별 **합계**
+-- 하나뿐이라 개별 주문은 새지 않는다.
+drop view if exists public.product_progress;
+create view public.product_progress
+with (security_invoker = false) as
+  select p.id as product_id,
+         p.min_quantity,
+         coalesce((
+           select sum(oi.quantity)
+           from public.order_items oi
+           join public.orders o on o.id = oi.order_id
+           where oi.product_id = p.id
+             and oi.status <> 'cancelled'
+             and o.status in ('paid', 'preparing', 'shipped', 'delivered')
+         ), 0)::integer as paid_quantity
+  from public.products p;
+
+grant select on public.product_progress to anon, authenticated;
+
+-- ── 환불 대기 목록 ────────────────────────────────────────────
+create table if not exists public.refund_requests (
+  id            uuid primary key default gen_random_uuid(),
+  order_id      uuid not null references public.orders (id) on delete cascade,
+  order_item_id uuid references public.order_items (id) on delete set null,
+  amount        integer not null check (amount >= 0),
+  reason        text not null default '',
+  status        text not null default 'pending'
+                  check (status in ('pending', 'done')),
+  memo          text not null default '',
+  created_at    timestamptz not null default now(),
+  done_at       timestamptz
+);
+
+create index if not exists idx_refund_requests_status
+  on public.refund_requests (status, created_at);
+
+alter table public.refund_requests enable row level security;
+
+-- 구매자도 자기 환불 진행 상황을 봐야 기다릴 수 있다. 쓰기는 관리자만.
+drop policy if exists "refund_requests_select" on public.refund_requests;
+create policy "refund_requests_select" on public.refund_requests
+  for select using (
+    public.is_admin()
+    or exists (select 1 from public.orders o
+               where o.id = order_id and o.user_id = auth.uid())
+  );
+drop policy if exists "refund_requests_update" on public.refund_requests;
+create policy "refund_requests_update" on public.refund_requests
+  for update using (public.is_admin()) with check (public.is_admin());
+
+-- ── 기존 트리거 보정 ──────────────────────────────────────────
+-- 주문 취소 시 재고 복원: 이미 무산으로 취소된 아이템은 그때 재고를 되돌렸다.
+-- 여기서 또 더하면 재고가 부풀어 오른다.
+create or replace function public.restore_stock_on_cancel()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  update public.products p
+  set stock = p.stock + oi.qty, updated_at = now()
+  from (
+    select product_id, sum(quantity) as qty
+    from public.order_items
+    where order_id = new.id and product_id is not null
+      and status <> 'cancelled'
+    group by product_id
+  ) oi
+  where p.id = oi.product_id;
+  return new;
+end;
+$$;
+
+-- 배송 단계 재계산에서 취소된 아이템 제외 (전부 취소면 주문도 취소 상태 유지)
+create or replace function public.update_item_status(
+  p_item_id uuid, p_status text, p_courier text default null,
+  p_tracking_number text default null)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_item  public.order_items%rowtype;
+  v_order public.orders%rowtype;
+  v_stage integer;
+begin
+  if p_status not in ('preparing', 'shipped', 'delivered') then
+    raise exception '허용되지 않는 배송 상태입니다: %', p_status;
+  end if;
+
+  select * into v_item from public.order_items where id = p_item_id;
+  if not found or (v_item.seller_id <> auth.uid() and not public.is_admin()) then
+    raise exception '본인 판매 상품만 변경할 수 있습니다.';
+  end if;
+  if v_item.status = 'cancelled' then
+    raise exception '취소된 상품은 배송 상태를 변경할 수 없습니다.';
+  end if;
+
+  select * into v_order from public.orders where id = v_item.order_id for update;
+  if v_order.status in ('pending_payment', 'cancelled') then
+    raise exception '결제 완료된 주문만 배송 상태를 변경할 수 있습니다.';
+  end if;
+
+  update public.order_items
+  set status = p_status,
+      courier = coalesce(p_courier, courier),
+      tracking_number = coalesce(p_tracking_number, tracking_number)
+  where id = p_item_id;
+
+  select min(case status when 'preparing' then 1 when 'shipped' then 2 else 3 end)
+    into v_stage
+  from public.order_items
+  where order_id = v_item.order_id and status <> 'cancelled';
+
+  if v_stage is not null then
+    update public.orders
+    set status = case v_stage when 1 then 'preparing'
+                              when 2 then 'shipped'
+                              else 'delivered' end,
+        updated_at = now()
+    where id = v_item.order_id;
+  end if;
+end;
+$$;
+
+-- ── 마감 판정 ─────────────────────────────────────────────────
+-- 마감된 MOQ 상품을 성사/무산으로 확정한다. pg_cron이 5분마다 호출.
+-- 미입금 주문 취소를 **세기 전에** 직접 하므로 다른 cron 잡과의 실행 순서에
+-- 기대지 않는다.
+create or replace function public.settle_group_buys()
+returns integer
+language plpgsql
+security definer set search_path = public
+as $fn$
+declare
+  v_p       record;
+  v_item    record;
+  v_order   record;
+  v_reached integer;
+  v_done    integer := 0;
+begin
+  for v_p in
+    select id, title, min_quantity, seller_id
+    from public.products
+    where min_quantity > 0
+      and ends_at <= now()
+      and moq_settled_at is null
+    for update
+  loop
+    -- 1) MOQ 상품의 무통장 입금 기한은 공구 마감이다. 미입금은 여기서 정리.
+    --    (재고 복원은 restore_stock_on_cancel 트리거가 처리)
+    update public.orders o
+    set status = 'cancelled', updated_at = now()
+    where o.status = 'pending_payment'
+      and exists (select 1 from public.order_items oi
+                  where oi.order_id = o.id and oi.product_id = v_p.id);
+
+    -- 2) 입금 완료 이후 주문만 세어 목표 달성 여부 판정
+    select coalesce(sum(oi.quantity), 0) into v_reached
+    from public.order_items oi
+    join public.orders o on o.id = oi.order_id
+    where oi.product_id = v_p.id
+      and oi.status <> 'cancelled'
+      and o.status in ('paid', 'preparing', 'shipped', 'delivered');
+
+    if v_reached >= v_p.min_quantity then
+      -- 3a) 성사 — 구매자에게 알리고, 셀러에게 발주해도 된다고 알린다
+      insert into public.notifications (user_id, title, body, link)
+      select distinct o.user_id,
+             '공동구매가 성사되었습니다',
+             v_p.title || ' 목표 수량을 채웠습니다. 준비되는 대로 발송해 드립니다.',
+             '/orders/' || o.id
+      from public.order_items oi
+      join public.orders o on o.id = oi.order_id
+      where oi.product_id = v_p.id
+        and oi.status <> 'cancelled'
+        and o.status in ('paid', 'preparing', 'shipped', 'delivered');
+
+      insert into public.notifications (user_id, title, body, link)
+      values (v_p.seller_id, '공동구매 성사',
+              v_p.title || ' — ' || v_reached || '개 확정. 발주하셔도 됩니다.',
+              '/seller');
+    else
+      -- 3b) 무산 — 아이템만 취소하고 환불 대기에 올린다.
+      --     한 주문에 다른 셀러 상품이 섞여 있을 수 있어 주문 전체를 취소하지
+      --     않는다. 그 상품들은 정상 진행돼야 한다.
+      for v_item in
+        select oi.id, oi.order_id, oi.quantity, oi.unit_price, o.user_id
+        from public.order_items oi
+        join public.orders o on o.id = oi.order_id
+        where oi.product_id = v_p.id
+          and oi.status <> 'cancelled'
+          and o.status in ('paid', 'preparing')
+      loop
+        update public.order_items set status = 'cancelled' where id = v_item.id;
+
+        update public.products
+        set stock = stock + v_item.quantity, updated_at = now()
+        where id = v_p.id;
+
+        insert into public.refund_requests (order_id, order_item_id, amount, reason)
+        values (v_item.order_id, v_item.id,
+                v_item.unit_price * v_item.quantity,
+                v_p.title || ' 공동구매 목표 수량 미달');
+
+        insert into public.notifications (user_id, title, body, link)
+        values (v_item.user_id, '공동구매가 무산되었습니다',
+                v_p.title || ' 이(가) 목표 수량을 채우지 못해 취소되었습니다. '
+                || '결제하신 금액은 전액 환불해 드립니다.',
+                '/orders/' || v_item.order_id);
+      end loop;
+
+      -- 살아있는 아이템이 하나도 없는 주문은 주문 자체를 취소한다.
+      -- 카드 결제분은 환불이 먼저다 (가드 트리거가 미환불 취소를 막는다).
+      for v_order in
+        select distinct o.id
+        from public.orders o
+        join public.order_items oi on oi.order_id = o.id
+        where oi.product_id = v_p.id
+          and o.status in ('paid', 'preparing')
+          and not exists (select 1 from public.order_items x
+                          where x.order_id = o.id and x.status <> 'cancelled')
+      loop
+        perform public.refund_card_payment(v_order.id, '공동구매 목표 수량 미달');
+        update public.orders
+        set status = 'cancelled', updated_at = now()
+        where id = v_order.id;
+      end loop;
+
+      insert into public.notifications (user_id, title, body, link)
+      values (v_p.seller_id, '공동구매 무산',
+              v_p.title || ' — 목표 ' || v_p.min_quantity || '개 중 '
+              || v_reached || '개에 그쳐 취소되었습니다.',
+              '/seller');
+    end if;
+
+    update public.products
+    set moq_settled_at = now(), status = 'closed', updated_at = now()
+    where id = v_p.id;
+
+    v_done := v_done + 1;
+  end loop;
+
+  return v_done;
+end;
+$fn$;
+
+revoke execute on function public.settle_group_buys() from public, anon, authenticated;
+
+select cron.schedule(
+  'settle-group-buys',
+  '*/5 * * * *',
+  $$ select public.settle_group_buys() $$
+);
+
+-- 관리자가 계좌 이체를 마친 뒤 환불 완료 처리
+create or replace function public.complete_refund(p_id uuid, p_memo text default '')
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception '관리자만 처리할 수 있습니다.';
+  end if;
+  update public.refund_requests
+  set status = 'done', done_at = now(), memo = p_memo
+  where id = p_id and status = 'pending';
+end;
+$$;
+
+grant execute on function public.complete_refund(uuid, text) to authenticated;

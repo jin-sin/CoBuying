@@ -26,6 +26,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final _price = TextEditingController();
   final _originalPrice = TextEditingController();
   final _stock = TextEditingController();
+  final _minQuantity = TextEditingController();
   final _salePrice = TextEditingController();
 
   DateTime _startsAt = DateTime.now();
@@ -59,6 +60,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _originalPrice.text =
           product.originalPrice == null ? '' : '${product.originalPrice}';
       _stock.text = '${product.stock}';
+      if (product.minQuantity > 0) {
+        _minQuantity.text = '${product.minQuantity}';
+      }
       _salePrice.text =
           product.salePrice == null ? '' : '${product.salePrice}';
       setState(() {
@@ -82,7 +86,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   @override
   void dispose() {
     for (final c in [
-      _title, _description, _price, _originalPrice, _stock, _salePrice,
+      _title, _description, _price, _originalPrice, _stock, _minQuantity,
+      _salePrice,
     ]) {
       c.dispose();
     }
@@ -235,6 +240,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           ? null
           : int.parse(_originalPrice.text.trim()),
       stock: int.parse(_stock.text.trim()),
+      minQuantity: int.tryParse(_minQuantity.text.trim()) ?? 0,
       imageUrls: _imageUrls,
       startsAt: _startsAt,
       endsAt: _endsAt,
@@ -359,6 +365,33 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                                 FilteringTextInputFormatter.digitsOnly
                               ],
                         validator: _requiredNumber,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _minQuantity,
+                        decoration: const InputDecoration(
+                          labelText: '공동구매 목표 수량 (선택)',
+                          hintText: '비워두면 목표 없이 판매합니다',
+                          helperText: '마감까지 이 수량을 못 채우면 자동으로 전량 취소·환불됩니다. '
+                              '재고를 미리 쌓지 않고 파실 때 쓰세요.',
+                          helperMaxLines: 3,
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                        validator: (v) {
+                          final t = v?.trim() ?? '';
+                          if (t.isEmpty) return null;
+                          final n = int.tryParse(t);
+                          if (n == null || n < 1) return '1 이상으로 입력해 주세요';
+                          final stock = int.tryParse(_stock.text.trim());
+                          // 목표가 재고보다 크면 달성 자체가 불가능하다
+                          if (stock != null && n > stock) {
+                            return '재고 수량($stock)보다 클 수 없습니다';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 24),
                       Text('옵션 (선택)',

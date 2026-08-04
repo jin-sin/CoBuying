@@ -13,6 +13,7 @@ import '../reviews/reviews_providers.dart';
 import '../seller/seller_providers.dart';
 import '../wishlist/wishlist_providers.dart';
 import 'categories.dart';
+import 'group_buy.dart';
 import 'product.dart';
 import 'products_providers.dart';
 import 'widgets/countdown_badge.dart';
@@ -111,6 +112,9 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     final reviewStats =
         ref.watch(allReviewStatsProvider).value ?? const <String, ReviewStats>{};
     final wishedIds = ref.watch(myWishlistIdsProvider).value ?? const <String>{};
+    // 목표 수량이 걸린 공동구매만 들어있다 (없으면 카드에 진행바가 안 붙는다)
+    final progress = ref.watch(groupBuyProgressProvider).value ??
+        const <String, GroupBuyProgress>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -222,6 +226,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             child: RefreshIndicator(
               onRefresh: () {
                 ref.invalidate(allReviewStatsProvider);
+                ref.invalidate(groupBuyProgressProvider);
                 return ref.refresh(activeProductsProvider.future);
               },
               child: products.when(
@@ -276,6 +281,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                                 (context, i) => ProductCard(
                                   product: filtered[i],
                                   stats: reviewStats[filtered[i].id],
+                                  progress: progress[filtered[i].id],
                                   wished: wishedIds.contains(filtered[i].id),
                                   onWishToggle: (wished) =>
                                       _toggleWish(filtered[i], wished),

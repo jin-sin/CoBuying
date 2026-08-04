@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_providers.dart';
+import 'group_buy.dart';
 import 'product.dart';
 import 'products_repository.dart';
 
@@ -23,6 +24,12 @@ final myProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) {
   ref.watch(authStateProvider);
   return ref.watch(productsRepositoryProvider).fetchMyProducts();
 });
+
+/// 공동구매 진행률 (목표 수량이 걸린 상품만). 상품 목록·상세·스토어가 공유한다.
+final groupBuyProgressProvider =
+    FutureProvider<Map<String, GroupBuyProgress>>(
+  (ref) => ref.watch(productsRepositoryProvider).fetchGroupBuyProgress(),
+);
 
 /// 공개 스토어프론트(/s/{slug})용: 한 셀러의 상품 (마감분 포함)
 final shopProductsProvider =
