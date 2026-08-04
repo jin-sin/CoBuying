@@ -34,10 +34,17 @@ eq('무음창 자정 전', inWindow(at('14:30'), '23:00', '08:00'), true);
 eq('무음창 자정 후', inWindow(at('20:00'), '23:00', '08:00'), true);
 eq('무음창 밖', inWindow(at('05:00'), '23:00', '08:00'), false);
 
-// pg_cron 유예 판정용 — 창이 끝난 뒤 얼마나 지났나
+// 부팅/pg_cron 유예 판정용 — 창이 끝난 뒤 얼마나 지났나
 eq('창 종료 5분 후', minutesSince(at('23:05'), '08:00'), 5);
 eq('창 종료 3시간 후', minutesSince(at('02:00'), '08:00'), 180);
 eq('창 종료 직전(거의 하루)', minutesSince(at('22:55'), '08:00'), 1435);
+
+// 부팅 유예 15분 — 08:01 오탐(2026-08-04)이 걸러지는지
+const booting = (utc) => minutesSince(at(utc), '08:00') < 15;
+eq('08:01은 아직 부팅 중', booting('23:01'), true);
+eq('08:14도 부팅 유예 안', booting('23:14'), true);
+eq('08:15부터는 감시', booting('23:15'), false);
+eq('한낮은 부팅 유예 아님', booting('06:00'), false);
 
 eq('하트비트 신선',
    heartbeatCheck({ heartbeat_age: { db_backup: 3600 } }, 'db_backup', 'DB 백업', 93600),

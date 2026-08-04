@@ -76,11 +76,18 @@ function heartbeatCheck(data, name, label, maxAgeSec) {
 }
 
 async function runChecks(env, now) {
-  const planned = inWindow(now, env.WINDOW_START, env.WINDOW_END);
   const checks = [];
 
   // 점검창 안에서는 서버가 꺼져 있는 게 정상이라 아무것도 보지 않는다
-  if (planned) return { planned, checks };
+  if (inWindow(now, env.WINDOW_START, env.WINDOW_END)) {
+    return { skip: '점검 시간', checks };
+  }
+
+  // WINDOW_END는 NAS에 "전원이 들어오는" 시각이지 서비스가 뜨는 시각이 아니다.
+  // 부팅에 4~5분 걸려서 창이 끝나자마자 확인하면 멀쩡한 아침을 장애로 잡는다.
+  if (minutesSince(now, env.WINDOW_END) < Number(env.BOOT_GRACE_MIN)) {
+    return { skip: '부팅 유예', checks };
+  }
 
   const supa = await probe(`${env.SUPABASE_URL}/rest/v1/`, [200, 401]);
   checks.push({ key: 'supabase', label: 'Supabase', ...supa });
@@ -90,11 +97,11 @@ async function runChecks(env, now) {
 
   // Supabase가 죽었으면 아래 항목은 전부 같이 실패한다. 알림을 도배하지 않도록
   // 원인 하나만 남기고 나머지는 건너뛴다.
-  if (!supa.ok) return { planned, checks };
+  if (!supa.ok) return { checks };
 
   const h = await health(env);
   checks.push({ key: 'health_rpc', label: '헬스체크 RPC', ok: h.ok, detail: h.detail });
-  if (!h.ok) return { planned, checks };
+  if (!h.ok) return { checks };
 
   const d = h.data;
   checks.push({
@@ -130,7 +137,7 @@ async function runChecks(env, now) {
     detail: `${d.push_pending}건 적체, 가장 오래된 것 ${Math.round(oldest / 60)}분`,
   });
 
-  return { planned, checks };
+  return { checks };
 }
 
 async function notify(env, text, quiet) {
@@ -159,8 +166,8 @@ const fmtDuration = (ms) => {
 };
 
 async function tick(env, now) {
-  const { planned, checks } = await runChecks(env, now);
-  if (planned) return { skipped: '점검 시간' };
+  const { skip, checks } = await runChecks(env, now);
+  if (skip) return { skipped: skip };
 
   const prev = JSON.parse((await env.MONITOR_STATE.get('state')) ?? '{}');
   const next = {};
@@ -209,7 +216,7 @@ export default {
       return new Response('unauthorized', { status: 401 });
     }
     const now = new Date();
-    const { planned, checks } = await runChecks(env, now);
-    return Response.json({ kst: kstMinutes(now), planned, checks });
+    const { skip, checks } = await runChecks(env, now);
+    return Response.json({ kst: kstMinutes(now), skip: skip ?? null, checks });
   },
 };
