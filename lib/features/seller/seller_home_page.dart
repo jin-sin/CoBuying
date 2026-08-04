@@ -453,6 +453,20 @@ class _SettlementTab extends ConsumerWidget {
                   _row(context, '지급 완료', '-${formatWon(s.totalPaid)}'),
                   const Divider(),
                   _row(context, '미지급 잔액', formatWon(s.balance), bold: true),
+                  // 0%는 초기 유치용이라 언젠가 바뀐다. 그 사실과 소급 안 된다는
+                  // 보장을 같이 적어둬야 셀러가 요율 변경을 불안해하지 않는다.
+                  if (profile.commissionRate == 0) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      '초기 입점 혜택으로 수수료 0%가 적용 중입니다. '
+                      '결제 수수료도 플랫폼이 부담합니다. 요율을 바꿀 때는 최소 30일 전에 '
+                      '알려드리며, 이미 접수된 주문에는 소급되지 않습니다.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: mutedText, height: 1.5),
+                    ),
+                  ],
                 ],
               ),
             ),

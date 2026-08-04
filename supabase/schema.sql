@@ -2049,3 +2049,31 @@ $$;
 
 revoke execute on function public.set_my_shop_slug(text) from public, anon;
 grant execute on function public.set_my_shop_slug(text) to authenticated;
+
+-- ------------------------------------------------------------
+-- 29. 입점 수수료 0% (초기 셀러 유치)
+--     인포크마켓이 3.45%(카드 결제 원가 수준)로 파는 시장에서 10%는 셀러가
+--     계산기를 두드리는 순간 진다. 게다가 우리는 아직 트래픽도 없다.
+--     셀러가 먼저 붙어야 마켓이 성립하므로 초기 요율은 0%로 간다.
+--     카드 결제 원가(약 3%)는 플랫폼이 떠안는다.
+--
+--     나중에 요율을 올려도 지난 주문은 order_items에 스냅샷된 요율로 정산되므로
+--     소급되지 않는다 (create_order가 주문 시점 요율을 박아둔다).
+--     0%를 약속할 수 있는 근거가 이것이다.
+-- ------------------------------------------------------------
+alter table public.seller_profiles alter column commission_rate set default 0.00;
+
+-- 기존 셀러도 0%로. 옛 기본값(10%)인 행만 건드려서 관리자가 개별 조정한
+-- 요율은 덮어쓰지 않는다.
+--
+-- protect_seller_privileges 트리거는 auth.uid()가 없는 psql 세션을 '관리자 아님'
+-- 으로 보고 수수료율 변경을 막는다. SQL Editor/psql로 돌리는 마이그레이션이라
+-- 잠시 껐다 켠다. (트리거가 하던 updated_at 갱신은 직접 넣는다)
+alter table public.seller_profiles disable trigger trg_protect_seller_privileges;
+
+update public.seller_profiles
+   set commission_rate = 0.00,
+       updated_at = now()
+ where commission_rate = 10.00;
+
+alter table public.seller_profiles enable trigger trg_protect_seller_privileges;

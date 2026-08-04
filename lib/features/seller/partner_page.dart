@@ -26,8 +26,8 @@ class PartnerPage extends StatelessWidget {
 
   static const _facts = [
     (Icons.link, '내 전용 판매 링크', '인스타 프로필·카톡 채널에 걸어둘 내 스토어 주소를 드립니다. 링크로 들어온 손님은 로그인 없이 바로 내 공동구매를 봅니다.'),
-    (Icons.percent, '수수료 10%', '판매액 기준. 주문 시점 요율이 그대로 적용되어 나중에 바뀌어도 지난 주문에 영향이 없습니다.'),
-    (Icons.payments_outlined, '입점비·월 이용료 없음', '팔린 만큼만 수수료가 발생합니다.'),
+    (Icons.percent, '지금 입점하면 수수료 0%', '초기 입점 셀러 대상입니다. 요율을 바꿀 때는 최소 30일 전에 알려드리고, 이미 접수된 주문에는 소급되지 않습니다.'),
+    (Icons.payments_outlined, '입점비·월 이용료 없음', '결제 수수료도 저희가 부담합니다. 파실 때 나가는 돈이 없습니다.'),
     (Icons.account_balance_outlined, '계좌는 나중에', '정산 계좌는 승인 후 등록하시면 됩니다. 신청 단계에서는 받지 않습니다.'),
     (Icons.badge_outlined, '사업자등록번호 필요', '간이과세자·신규 사업자도 신청하실 수 있습니다.'),
   ];
