@@ -46,6 +46,44 @@ Studio > **SQL Editor** 에서 이 폴더의 `schema.sql` 전체를 붙여넣고
 마지막으로 본인 계정으로 앱에서 1회 로그인한 뒤, `schema.sql` 맨 아래 주석의
 관리자 지정 쿼리를 실행하세요.
 
+> **항상 같은 역할로 적용할 것 (`supabase_admin`).** `cron.schedule`은
+> (jobname, username)으로 중복을 막기 때문에, 같은 스키마를 `postgres`로 한 번
+> `supabase_admin`으로 한 번 돌리면 **같은 잡이 두 벌 등록된다**
+> (2026-08-16에 `expire-unpaid-card-orders`가 이 상태로 발견돼 정리했다).
+> Studio SQL Editor는 `postgres`로 붙으므로, SSH로 적용하는 쪽을 권한다:
+>
+> ```bash
+> ssh -p 2022 shinnas_admin@orange-man.xyz "/usr/local/bin/docker cp /volume1/docker/supabase/schema.sql supabase-db:/tmp/schema.sql && /usr/local/bin/docker exec supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 --single-transaction -f /tmp/schema.sql"
+> ```
+>
+> 중복이 생겼는지는 이걸로 본다 — 이름이 두 번 나오면 `cron.unschedule(<jobid>)`:
+>
+> ```sql
+> select jobid, jobname, username, schedule from cron.job order by jobname;
+> ```
+
+### 백그라운드 워커 수 (`max_worker_processes`)
+
+pg_cron은 잡 하나마다 백그라운드 워커를 하나씩 띄운다. 기본값 8은 pg_cron
+launcher·logical replication launcher·pg_net 워커가 상시 3칸을 먹고 병렬 쿼리도
+같은 풀을 써서, 매 :00·:10처럼 여러 잡이 겹치는 순간에 `job startup timeout`으로
+잡이 조용히 실패한다. 16으로 올려 뒀다:
+
+```sql
+alter system set max_worker_processes = 16;   -- supabase_admin으로 실행
+```
+
+`ALTER SYSTEM`은 PGDATA의 `postgresql.auto.conf`에 쓰이고 PGDATA는 볼륨이라
+컨테이너를 다시 만들어도 남는다 (이미지 안의 `/etc/postgresql/postgresql.conf`를
+고치면 이미지 갱신 때 사라진다). **postmaster 설정이라 적용에 재시작이 필요하다** —
+`docker restart supabase-db`. 실패한 잡은 여기서 확인한다:
+
+```sql
+select jobid, status, return_message, start_time
+from cron.job_run_details where status <> 'succeeded'
+order by start_time desc limit 20;
+```
+
 ## 4. 소셜 로그인 설정 (Studio > Authentication > Providers)
 
 ### 카카오 (Supabase 기본 지원)
