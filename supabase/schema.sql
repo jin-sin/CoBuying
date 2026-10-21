@@ -438,7 +438,7 @@ create extension if not exists pg_cron;
 
 select cron.schedule(
   'close-expired-products',
-  '*/5 * * * *',
+  '1-59/5 * * * *',
   $$ update public.products set status = 'closed', updated_at = now()
      where status = 'active' and ends_at <= now() $$
 );
@@ -556,7 +556,7 @@ $$;
 -- 24시간 내 미입금 주문 자동 취소 (재고 복원은 위 트리거가 처리)
 select cron.schedule(
   'expire-unpaid-orders',
-  '*/10 * * * *',
+  '2-59/10 * * * *',
   $$ update public.orders set status = 'cancelled', updated_at = now()
      where status = 'pending_payment'
        and payment_method = 'bank_transfer'
@@ -772,7 +772,7 @@ $fn$;
 -- 결제창까지 갔다가 이탈한 카드 주문은 1시간 후 자동 취소 (재고 복원은 취소 트리거)
 select cron.schedule(
   'expire-unpaid-card-orders',
-  '*/10 * * * *',
+  '4-59/10 * * * *',
   $$ update public.orders set status = 'cancelled', updated_at = now()
      where status = 'pending_payment'
        and payment_method = 'card'
@@ -2372,7 +2372,7 @@ revoke execute on function public.settle_group_buys() from public, anon, authent
 
 select cron.schedule(
   'settle-group-buys',
-  '*/5 * * * *',
+  '3-59/5 * * * *',
   $$ select public.settle_group_buys() $$
 );
 

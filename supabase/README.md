@@ -62,21 +62,30 @@ Studio > **SQL Editor** 에서 이 폴더의 `schema.sql` 전체를 붙여넣고
 > select jobid, jobname, username, schedule from cron.job order by jobname;
 > ```
 
-### 백그라운드 워커 수 (`max_worker_processes`)
+### pg_cron 시작 지연과 일정 분산
 
-pg_cron은 잡 하나마다 백그라운드 워커를 하나씩 띄운다. 기본값 8은 pg_cron
-launcher·logical replication launcher·pg_net 워커가 상시 3칸을 먹고 병렬 쿼리도
-같은 풀을 써서, 매 :00·:10처럼 여러 잡이 겹치는 순간에 `job startup timeout`으로
-잡이 조용히 실패한다. 16으로 올려 뒀다:
+2026-10-16 운영 조회에서 `cron.use_background_workers=off`를 확인했다.
+이 모드의 작업은 DB 연결을 사용하므로 `job startup timeout`만 보고
+`max_worker_processes`를 늘리거나 DB를 재시작하지 않는다. 먼저 실제 모드,
+연결 사용량, pg_cron launcher의 대기 이벤트와 NAS 디스크 지연을 확인한다.
 
-```sql
-alter system set max_worker_processes = 16;   -- supabase_admin으로 실행
-```
+같은 날 반복 실패를 조사해 10분 경계에 작업 6개가 몰리는 패턴과 스케줄러의
+WAL 저장 대기를 관측했다. 12:36 KST에 작업 소유자 `supabase_admin`으로
+`cron.alter_job`의 일정 필드만 변경했다. 처리 SQL·작업 ID·실행 주기는 유지했다.
+`schema.sql`도 재적용 때 기존 동시 시작 일정으로 돌아가지 않도록 맞췄다.
 
-`ALTER SYSTEM`은 PGDATA의 `postgresql.auto.conf`에 쓰이고 PGDATA는 볼륨이라
-컨테이너를 다시 만들어도 남는다 (이미지 안의 `/etc/postgresql/postgresql.conf`를
-고치면 이미지 갱신 때 사라진다). **postmaster 설정이라 적용에 재시작이 필요하다** —
-`docker restart supabase-db`. 실패한 잡은 여기서 확인한다:
+| 작업 | 일정 |
+|---|---|
+| close-expired-products | `1-59/5 * * * *` |
+| expire-unpaid-orders | `2-59/10 * * * *` |
+| expire-unpaid-card-orders | `4-59/10 * * * *` |
+| settle-group-buys | `3-59/5 * * * *` |
+
+1분 주기 작업 2개를 포함한 최대 동시 시작은 3개다. 일정 변경은 전체 스키마
+재적용 없이 기존 jobid의 `cron.alter_job`으로 수행한다. 변경 전 정의를 보관하고
+명령·소유자·활성 상태 보존 및 모든 작업의 자연 실행을 검증한다. 상세 조사와
+관측 결과는 별도 orange-man-infrastructure 프로젝트의
+`docs/INCIDENT-2026-10-16-PG-CRON.md`에 기록한다. 실패한 잡은 다음으로 확인한다:
 
 ```sql
 select jobid, status, return_message, start_time
