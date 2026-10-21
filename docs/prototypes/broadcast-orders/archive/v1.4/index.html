@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; connect-src 'none'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>오렌담마켓 · 방송 주문 인터페이스 시안</title>
+  <link rel="stylesheet" href="styles.css?v=7.0">
+  <script defer src="app.js?v=7.0"></script>
+</head>
+<body>
+  <aside class="demo-bar" aria-label="시안 전환 도구">
+    <div class="demo-label"><strong>인터페이스 시안</strong><span>가상 데이터 · 실제 주문/송금 없음</span></div>
+    <nav class="demo-roles" aria-label="시안 역할">
+      <button data-role="customer" aria-pressed="true">손님 화면</button>
+      <button data-role="operator" aria-pressed="false">방송 담당자</button>
+      <button data-role="collector" aria-pressed="false">입금 확인자</button>
+    </nav>
+    <label class="demo-person">시안 손님 <select id="demo-guest"><option value="A">손님 A</option><option value="B">손님 B</option></select></label>
+    <button class="demo-scenario" data-action="seed-correction" title="가상 정정 예시로 초기화합니다">정정 상황 체험</button>
+    <button class="demo-scenario" data-action="seed-exclusion" title="가상 두 상품의 제외 예시로 초기화합니다">상품 제외 체험</button>
+    <button class="demo-reset" id="reset-demo">처음부터</button>
+  </aside>
+  <div id="app"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="product-dialog" aria-labelledby="product-dialog-title"></dialog>
+  <dialog id="manage-dialog" aria-labelledby="manage-title"></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="dialog-heading"><h2 id="help-title">내 주문을 다시 찾으려면</h2><button data-close="help-dialog" aria-label="도움말 닫기">×</button></div>
+    <p>주문할 때 사용한 일반 브라우저에서 같은 링크를 열어 주세요.</p>
+    <p>브라우저나 휴대폰을 바꿨다면 판매자에게 기존 연락 경로로 문의해 주세요. 본인 확인 후 해당 주문을 연결하는 개인 링크를 안내받습니다.</p>
+    <div class="notice">개인 연결 링크는 단체방에 공유하지 마세요. 같은 닉네임만으로 다른 기기의 주문을 연결하지 않습니다.</div>
+    <p class="muted small">현재 시안에는 실제 복구 기능이 없습니다. 상단 손님 A/B는 주문 구분을 보는 체험 도구입니다.</p>
+    <button class="primary full" data-close="help-dialog">알겠어요</button>
+  </dialog>
+</body>
+</html>

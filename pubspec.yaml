@@ -1,5 +1,5 @@
 name: cobuying
-description: "App for co-buying"
+description: "오렌담마켓 — 셀러와 고객을 연결하는 공동구매 마켓"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -49,10 +49,14 @@ dependencies:
   shared_preferences: ^2.5.5
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
+  http: ^1.5.0
+  excel: ^4.0.6
+  file_saver: ^0.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  shared_preferences_platform_interface: ^2.4.2
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

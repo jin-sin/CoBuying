@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,6 +65,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   icon: Icons.chat_bubble,
                   onPressed: _busy ? null : () => _signIn(auth.signInWithKakao),
                 ),
+                if (!kReleaseMode &&
+                    const bool.fromEnvironment('BROADCAST_TEST_AUTH')) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _signIn(() async {
+                              await ref
+                                  .read(supabaseClientProvider)
+                                  .auth
+                                  .signInAnonymously();
+                            }),
+                    child: const Text('방송 테스트 계정으로 로그인'),
+                  ),
+                ],
                 if (_busy) ...[
                   const SizedBox(height: 24),
                   const Center(child: CircularProgressIndicator()),

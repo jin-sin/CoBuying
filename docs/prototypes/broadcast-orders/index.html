@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' blob: data:; connect-src 'none'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <title>오렌담마켓 · 방송판매 업무 시안 v2.2.0</title>
+    <link rel="stylesheet" href="styles.css?v=9" />
+    <script type="module" src="app.js?v=10"></script>
+  </head>
+  <body>
+    <aside class="demo">
+      <strong>동작 시안 v2.2.0</strong
+      ><span>가상 데이터 · 새로고침 시 초기화 · 실제 저장/송금 없음</span>
+      <div class="row">
+        <button data-act="role" data-value="staff">담당자 화면</button
+        ><button data-act="role" data-value="customer">고객 화면</button
+        ><label
+          >체험 고객
+          <select id="demo-customer">
+            <option value="c1">몽이맘</option>
+            <option value="c2">몽베베</option>
+          </select></label
+        ><button data-act="seed">320위안 업무 예시</button
+        ><button data-act="new-device">새 기기 체험</button
+        ><button data-act="advance">15일 후 체험</button
+        ><button data-act="reset">초기화</button>
+      </div>
+    </aside>
+    <div id="app"></div>
+    <p id="toast" role="status" aria-live="polite"></p>
+    <dialog id="dialog"></dialog>
+  </body>
+</html>

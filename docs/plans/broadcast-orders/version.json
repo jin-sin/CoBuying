@@ -1,0 +1,16 @@
+{
+  "requirements": "v1",
+  "bundle": "v2.2.0",
+  "stages": {
+    "B00": { "version": null, "status": "completed-before-versioning", "record": "worklog.md" },
+    "B01": { "version": "v0.2.4", "status": "in-progress", "record": "versions/B01-v0.2.4.md" },
+    "B02": { "version": "v0.2.0", "status": "in-progress", "record": "versions/B02-v0.2.0.md" },
+    "B03": { "version": "v0.8.1", "status": "in-progress", "record": "versions/B03-v0.8.1.md" },
+    "B04": { "version": "v0.2.1", "status": "in-progress", "record": "versions/B04-v0.2.1.md" },
+    "B05": { "version": "v0.3.0", "status": "in-progress", "record": "versions/B05-v0.3.0.md" },
+    "B06": { "version": "v0.3.0", "status": "in-progress", "record": "versions/B06-v0.3.0.md" },
+    "B07": { "version": "v0.4.0", "status": "in-progress", "record": "versions/B07-v0.4.0.md" },
+    "B08": { "version": "v0.4.0", "status": "in-progress", "record": "versions/B08-v0.4.0.md" },
+    "B09": { "version": "v0.2.3", "status": "in-progress", "record": "versions/B09-v0.2.3.md" }
+  }
+}

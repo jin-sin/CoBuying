@@ -1,0 +1,402 @@
+:root {
+  --ink: #24322f;
+  --muted: #697770;
+  --orange: #bd541f;
+  --line: #dedfd8;
+  --cream: #f6f5ef;
+  --green: #245b47;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+  font-size: 15px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+button {
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  min-height: 44px;
+}
+button:hover {
+  border-color: var(--green);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.primary {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+.danger {
+  color: #a23d2d;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.between {
+  justify-content: space-between;
+}
+.demo {
+  padding: 12px 24px;
+  background: #e9e8df;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.demo span {
+  margin-left: 12px;
+  color: var(--muted);
+}
+.demo .row {
+  margin-top: 8px;
+}
+.demo button,
+.demo select {
+  font-size: 12px;
+  padding: 7px 10px;
+  min-height: 36px;
+}
+header {
+  max-width: 1180px;
+  margin: auto;
+  padding: 26px 24px 14px;
+}
+h1 {
+  font-size: 26px;
+  margin: 6px 0 10px;
+  letter-spacing: -1px;
+}
+h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+p {
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.brand {
+  font-size: 12px;
+  letter-spacing: 3px;
+  font-weight: 800;
+  color: var(--orange);
+}
+.muted,
+small {
+  color: var(--muted);
+}
+small {
+  font-size: 12px;
+}
+.layout {
+  max-width: 1180px;
+  margin: auto;
+  padding: 10px 24px 70px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 24px;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: start;
+}
+.nav button {
+  text-align: left;
+  border: 0;
+  background: transparent;
+}
+.nav button.active {
+  background: #dfebe4;
+  color: var(--green);
+  font-weight: 700;
+}
+.customer {
+  max-width: 680px;
+  margin: auto;
+  padding: 12px 20px 80px;
+}
+.card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 14px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stat {
+  background: #e8ede5;
+  border-radius: 12px;
+  padding: 15px;
+}
+.stat b {
+  display: block;
+  font-size: 28px;
+  margin-top: 8px;
+}
+.notice {
+  background: #f9eedc;
+  border: 1px solid #eedcb8;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.tag {
+  display: inline-block;
+  border-radius: 6px;
+  background: #edf1eb;
+  color: var(--green);
+  padding: 3px 7px;
+  font-size: 12px;
+}
+.line {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.line:last-child {
+  border-bottom: 0;
+}
+.number {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--orange);
+}
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #c9cec5;
+  background: white;
+  color: var(--ink);
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 10px;
+  margin: 5px 0 12px;
+  max-width: 100%;
+}
+input[type="checkbox"] {
+  width: 18px;
+  min-height: 18px;
+  margin: 0 8px 0 0;
+  vertical-align: middle;
+}
+input[type="number"] {
+  min-width: 0;
+}
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.full {
+  width: 100%;
+}
+.total {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 12px 0;
+}
+.candidate {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 5px;
+}
+.candidate.selected {
+  background: #e3efe8;
+  border-color: var(--green);
+}
+.task {
+  border-left: 4px solid var(--orange);
+}
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  max-width: 560px;
+  width: calc(100% - 28px);
+  padding: 22px;
+  max-height: 90dvh;
+  overflow: auto;
+  color: var(--ink);
+}
+dialog::backdrop {
+  background: #182c2560;
+}
+#toast {
+  position: fixed;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  background: var(--ink);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  z-index: 5;
+  display: none;
+}
+#toast.show {
+  display: block;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.scroll {
+  overflow-x: auto;
+}
+a {
+  color: var(--green);
+}
+.empty {
+  padding: 32px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+.history {
+  color: var(--muted);
+  font-size: 12px;
+}
+.row > * {
+  max-width: 100%;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #bc7338;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .layout {
+    display: block;
+    padding: 8px 14px 70px;
+  }
+  .nav {
+    flex-direction: row;
+    overflow: auto;
+    margin-bottom: 18px;
+    padding-bottom: 8px;
+  }
+  .nav button {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .demo {
+    padding: 10px 14px;
+  }
+  .demo span {
+    display: block;
+    margin: 4px 0;
+  }
+  .demo label {
+    max-width: 160px;
+  }
+  header {
+    padding: 20px 16px 6px;
+  }
+  .card {
+    padding: 16px;
+  }
+  .stats {
+    gap: 6px;
+  }
+  .stat {
+    padding: 10px;
+    font-size: 12px;
+  }
+  .stat b {
+    font-size: 24px;
+  }
+  h1 {
+    font-size: 24px;
+  }
+  .customer {
+    padding: 12px 14px 70px;
+  }
+  .two {
+    gap: 8px;
+  }
+  button {
+    padding: 10px 12px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.session-picker {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.transfer-guide {
+  background: #f1f5ef;
+  padding: 16px;
+  margin: 12px 0;
+  border-radius: 12px;
+}
+details {
+  margin-top: 16px;
+}
+summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
