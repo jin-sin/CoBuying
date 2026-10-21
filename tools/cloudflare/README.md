@@ -4,7 +4,7 @@ NAS 전원 스케줄(매일 02:00~08:00 KST) 동안 서버가 꺼지면 웹 신�
 아무 안내도 못 보고 접속 실패를 겪는다. Cloudflare 프록시를 앞단에 두고,
 원본 응답 실패를 감지하면 Worker가 점검 안내 페이지를 대신 보여준다.
 
-- `shop.orange-man.xyz` → 오렌지맨 break time 안내 (한국어)
+- `shop.orange-man.xyz` → 오렌담마켓 break time 안내 (한국어)
 - `photo.orange-man.xyz` → 乐梦童装 유지보수 안내 (중국어)
 - 시간 하드코딩 없이 "원본 다운"을 감지하므로 예정에 없는 장애에도 동작.
 

@@ -5,14 +5,16 @@
 /// 문안은 표준 템플릿 기반 초안으로, 실제 오픈 전 법무 검토를 권장한다.
 library;
 
+import '../../core/service_brand.dart';
+
 /// 사업자 정보 — 전자상거래법상 표시 의무 항목.
 /// 사업자등록번호는 국세청 체크섬 검증을 통과한 값이다.
 /// 값이 바뀌면 여기만 고치면 사업자정보·개인정보처리방침에 함께 반영된다.
 class BusinessInfo {
-  /// 서비스명 — 통신판매업 신고 상호(companyName)와 같게 맞춰 둔다
-  static const serviceName = '오렌지맨';
+  /// 서비스 브랜드. 등록된 사업자 상호와 독립적으로 관리한다.
+  static const serviceName = ServiceBrand.name;
 
-  /// 상호(법인/사업자명)
+  /// 기존에 기재된 사업자 상호. 등록 변경 확인 없이 브랜드명으로 치환하지 않는다.
   static const companyName = '오렌지맨';
 
   /// 대표자명 — 무통장 수취계좌 예금주 기준 (확인 필요)
@@ -47,7 +49,8 @@ class BusinessInfo {
 
   /// 사업자정보 표시용 (라벨, 값) 목록
   static const List<(String, String)> rows = [
-    ('상호', companyName),
+    ('서비스명', serviceName),
+    ('상호(운영 사업자)', companyName),
     ('대표자', representative),
     ('사업자등록번호', businessRegNo),
     ('통신판매업 신고번호', mailOrderRegNo),
@@ -63,25 +66,26 @@ class BusinessInfo {
 class LegalDoc {
   const LegalDoc({required this.title, required this.updated, required this.sections});
   final String title;
-  final String updated; // 시행일
+  final String updated; // 문안 수정일. 운영 적용·공지일은 공개 전에 확정한다.
   final List<(String, String)> sections;
 }
 
 /// 통신판매중개자 면책 고지 — 상품 상세·체크아웃 등에서 짧게 재사용
 const brokerNotice =
-    '${BusinessInfo.serviceName}은 통신판매중개자로서 통신판매의 당사자가 '
+    '${BusinessInfo.serviceName}의 운영자 ${BusinessInfo.companyName}은 '
+    '통신판매중개자로서 통신판매의 당사자가 '
     '아니며, 개별 상품의 상품정보·거래·배송·환불에 대한 책임은 판매자(입점 셀러)에게 '
     '있습니다. 다만 결제·정산 등 중개 과정에서 운영자의 고의 또는 과실이 있는 경우 '
     '그 범위에서 책임을 부담합니다.';
 
 final termsDoc = LegalDoc(
   title: '이용약관',
-  updated: '시행일: 2026년 7월 20일',
+  updated: '최종 수정: 2026년 9월 13일',
   sections: [
     ('제1조 (목적)',
-        // 상호와 서비스명이 같아 이름을 두 번 적지 않는다
         '본 약관은 ${BusinessInfo.companyName}(이하 "회사")이 운영하는 통신판매중개 '
-        '서비스(이하 "서비스")의 이용과 관련하여 회사와 이용자의 권리·의무 및 '
+        '서비스 "${BusinessInfo.serviceName}"(이하 "서비스")의 이용과 관련하여 '
+        '회사와 이용자의 권리·의무 및 '
         '책임사항을 규정함을 목적으로 합니다.'),
     ('제2조 (통신판매중개자의 지위)',
         '$brokerNotice\n\n'
@@ -122,8 +126,12 @@ final termsDoc = LegalDoc(
 
 final privacyDoc = LegalDoc(
   title: '개인정보처리방침',
-  updated: '시행일: 2026년 7월 20일',
+  updated: '최종 수정: 2026년 9월 13일',
   sections: [
+    ('개인정보 처리 주체',
+        '${BusinessInfo.companyName}(이하 "회사")은 '
+        '"${BusinessInfo.serviceName}" 서비스의 운영자로서 이용자의 개인정보를 '
+        '처리하며, 이 방침을 통해 개인정보 처리 항목·목적과 이용자의 권리를 안내합니다.'),
     ('1. 수집하는 개인정보 항목',
         '• 회원가입: 소셜 로그인 제공 정보(이름 또는 닉네임, 이메일, 프로필 식별자)\n'
         '• 주문·배송: 받는 사람, 연락처, 주소, 배송 메모, (무통장) 입금자명\n'

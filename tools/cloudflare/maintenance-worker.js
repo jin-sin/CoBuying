@@ -46,7 +46,7 @@ const SHOP_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>오렌지맨 · 점검 시간</title>
+<title>오렌담마켓 · 점검 시간</title>
 <style>
   body { margin:0; font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
          background:#fdf6f0; color:#3e2723; display:flex; align-items:center;

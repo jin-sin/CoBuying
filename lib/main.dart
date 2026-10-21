@@ -8,6 +8,7 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart'
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/env.dart';
+import 'core/service_brand.dart';
 import 'core/theme.dart';
 import 'features/maintenance/maintenance_gate.dart';
 import 'features/notifications/push/push_providers.dart';
@@ -55,7 +56,7 @@ class _CoBuyingAppState extends ConsumerState<CoBuyingApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: '오렌지맨',
+      title: ServiceBrand.name,
       theme: buildAppTheme(),
       routerConfig: router,
       // 점검 시간대(서버 전원 스케줄)에는 전체 화면 안내로 덮는다

@@ -31,7 +31,7 @@
 		<string>kakaolink</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>오렌지맨</string>
+	<string>오렌담마켓</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -39,7 +39,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>cobuying</string>
+	<string>ORENDAM</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

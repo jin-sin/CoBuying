@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'service_brand.dart';
 import 'theme.dart';
 
 /// 브랜드 마크 — 오렌지 슬라이스 (시안 A).
@@ -78,7 +79,7 @@ class _BrandMarkPainter extends CustomPainter {
   bool shouldRepaint(_BrandMarkPainter old) => old.plated != plated;
 }
 
-/// 브랜드 워드마크 — "오렌지맨"에서 '오렌지'만 브랜드색
+/// 브랜드 워드마크 — "오렌담마켓"에서 '오렌담'만 브랜드색.
 class BrandWordmark extends StatelessWidget {
   const BrandWordmark({super.key, this.fontSize = 20});
 
@@ -95,8 +96,10 @@ class BrandWordmark extends StatelessWidget {
           color: inkText,
         ),
         children: const [
-          TextSpan(text: '오렌지', style: TextStyle(color: brandOrange)),
-          TextSpan(text: '맨'),
+          TextSpan(
+              text: ServiceBrand.wordmarkHead,
+              style: TextStyle(color: brandOrange)),
+          TextSpan(text: ServiceBrand.wordmarkTail),
         ],
       ),
     );
