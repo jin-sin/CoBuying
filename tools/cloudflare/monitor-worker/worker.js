@@ -186,6 +186,20 @@ async function notify(env, text, quiet) {
   if (!resp.ok) console.log('텔레그램 전송 실패:', resp.status, await resp.text());
 }
 
+// 크론은 Cloudflare가 고른 콜로에서 돈다 — 우리가 지정할 수 없다. 어느
+// 콜로였는지 남겨두면 '해외 콜로일 때만 막힌다'를 추측이 아니라 기록으로
+// 확인할 수 있다. 원본 방화벽의 지역 제한을 의심할 때 이 한 줄이 결론을 낸다.
+async function colo() {
+  try {
+    const r = await fetch('https://cloudflare.com/cdn-cgi/trace', {
+      signal: AbortSignal.timeout(5000),
+    });
+    return (await r.text()).match(/^colo=(\w+)/m)?.[1] ?? '?';
+  } catch {
+    return '?';
+  }
+}
+
 const fmtDuration = (ms) => {
   const m = Math.round(ms / 60000);
   return m < 60 ? `${m}분` : `${Math.floor(m / 60)}시간 ${m % 60}분`;
@@ -236,6 +250,11 @@ async function tick(env, now) {
   const { skip, checks } = await runChecks(env, now);
   if (skip) return { skipped: skip };
 
+  console.log(JSON.stringify({
+    colo: await colo(),
+    checks: checks.map((c) => ({ k: c.key, ok: c.ok, d: c.detail })),
+  }));
+
   const prev = JSON.parse((await env.MONITOR_STATE.get('state')) ?? '{}');
   const { next, down, up } = decide(
     prev, checks, now.getTime(), Number(env.FAIL_THRESHOLD ?? 2));
@@ -250,7 +269,7 @@ async function tick(env, now) {
     lines.push(`🟢 ${c.label} 정상 복구${dur}`);
   }
   if (lines.length) {
-    await notify(env, `[오렌지맨]\n${lines.join('\n')}`, quiet);
+    await notify(env, `[오렌담마켓]\n${lines.join('\n')}`, quiet);
   }
 
   return { checked: checks.length, changed: lines.length, quiet };

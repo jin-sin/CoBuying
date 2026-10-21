@@ -60,7 +60,7 @@ Worker 로그는 `[observability]`로 켜져 있다. 오탐을 다시 쫓게 되
 
    - 텔레그램에서 `@BotFather`를 검색한다 (파란 인증 배지가 붙은 쪽이 진짜).
    - `/newbot` 을 보낸다.
-   - **표시 이름**을 묻는다 — 아무거나. 예: `오렌지맨 모니터`
+   - **표시 이름**을 묻는다 — 아무거나. 예: `오렌담마켓 모니터`
    - **사용자명**을 묻는다 — `bot`으로 끝나야 하고 전 세계에서 유일해야 한다.
      예: `orangeman_monitor_bot`
    - 성공하면 `Use this token to access the HTTP API:` 뒤에 토큰이 온다
